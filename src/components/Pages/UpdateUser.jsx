@@ -7,7 +7,7 @@ import "../../assets/vendor/select/select2.min.css";
 import "../../assets/css/style.css";
 import "../../assets/css/responsive.css";
 import Header from "../Layout/Header";
-import SideBar from "../Layout/SideBar";
+import SideBar from "../Layout/side";
 
 const UpdateUser = () => {
   const { id } = useParams(); // Récupérer l'ID de l'utilisateur depuis l'URL
