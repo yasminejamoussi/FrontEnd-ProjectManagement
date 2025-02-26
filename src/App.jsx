@@ -12,6 +12,9 @@ import LandingPage from "./components/Pages/LandingPage.jsx";
 import Profile from "./components/Pages/Profile.jsx";
 import UserProfileForm from "./components/Pages/UserProfileForm.jsx";
 import { useState } from "react";
+import TwoFactorAuth from "./components/Auth/TwoFactorAuth.jsx";
+import Dashboard from "./components/Pages/Dashboard.jsx";
+import Sidebar from "./components/Layout/SideBar.jsx";
 
 // Wrapper pour Google OAuth
 const GoogleWrapper = () => (
@@ -36,6 +39,10 @@ function App() {
         <Route path="/pswdreset" element={<PasswordReset />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/" element={<LandingPage />} />
+        <Route path="/verify-2fa" element={<TwoFactorAuth />} />
+        <Route path="/dash" element={<Dashboard />} />
+        <Route path="/side" element={<Sidebar />} />
+
       </Routes>
     </Router>
   );

@@ -4,7 +4,7 @@ import '../../assets/vendor/glightbox/glightbox.min.css'; // Assuming these are 
 import '../../assets/vendor/apexcharts/apexcharts.css';
 import '../../assets/vendor/select/select2.min.css';
 import Header from "../Layout/Header";
-import SideBar from "../Layout/SideBar";
+import SideBar from "../Layout/side";
 import UserProfileForm from "../Pages/UserProfileForm"; // Assure-toi que le chemin est correct
 
 const Profile = () => {

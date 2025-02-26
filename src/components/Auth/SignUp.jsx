@@ -1,7 +1,7 @@
 import React, { useState,useEffect } from 'react'; 
 import { Link, useNavigate } from 'react-router-dom';
 import { useGoogleLogin } from '@react-oauth/google';
-import { googleAuth, facebookAuth ,githubAuth} from '../../api'; 
+import { googleAuth} from '../../api'; 
 
 import "../../assets/css/style.css";
 
@@ -220,7 +220,7 @@ const SignUp = () => {
                       </div>
                       <div className="col-12">
                         <div className="text-center">
-                          <button className="btn btn-light-facebook icon-btn b-r-22 m-1" type="button" onClick={handleFacebookLogin}>
+                          <button className="btn btn-light-facebook icon-btn b-r-22 m-1" type="button" >
                             <i className="ti ti-brand-facebook"></i>
                           </button>
                           <button className="btn btn-light-gmail icon-btn b-r-22 m-1" type="button" onClick={googleLogin}> 

@@ -8,8 +8,4 @@ const api = axios.create({
 // Authentification Google
 export const googleAuth = (code) => api.get(`/google?code=${code}`);
 
-// Authentification Facebook
-export const facebookAuth = (accessToken) => api.post('/facebook', { access_token: accessToken });
 
-// Authentification GitHub
-export const githubAuth = (code) => api.get(`/github?code=${code}`);
