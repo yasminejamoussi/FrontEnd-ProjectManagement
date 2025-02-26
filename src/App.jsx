@@ -14,7 +14,8 @@ import UserProfileForm from "./components/Pages/UserProfileForm.jsx";
 import { useState } from "react";
 import TwoFactorAuth from "./components/Auth/TwoFactorAuth.jsx";
 import Dashboard from "./components/Pages/Dashboard.jsx";
-import Sidebar from "./components/Layout/SideBar.jsx";
+import Sidebar from "./components/Layout/Sidebar.jsx";
+import RoleManagement from "./components/Pages/RoleManagement.jsx";
 
 // Wrapper pour Google OAuth
 const GoogleWrapper = () => (
@@ -42,6 +43,7 @@ function App() {
         <Route path="/verify-2fa" element={<TwoFactorAuth />} />
         <Route path="/dash" element={<Dashboard />} />
         <Route path="/side" element={<Sidebar />} />
+        <Route path="/roles" element={<RoleManagement />} />
 
       </Routes>
     </Router>

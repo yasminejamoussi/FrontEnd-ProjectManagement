@@ -33,7 +33,7 @@ const FaceRecognition = ({ onSuccess }) => {
     };
 
     const getLabeledFaceDescriptions = async () => {
-      const labels = [ "yas"];
+      const labels = [ "yas","ranou"];
       return Promise.all(
         labels.map(async (label) => {
           const descriptions = [];
