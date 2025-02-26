@@ -4,7 +4,7 @@ import { Modal, Button } from "react-bootstrap";
 import { Link } from "react-router-dom";
 import { FaTrash, FaEdit, FaSearch } from "react-icons/fa";
 import Header from "../Layout/Header";
-import SideBar from "../Layout/side";
+import Sidebar from "../Layout/Sidebar";
 
 const ApiPage = () => {
   const [users, setUsers] = useState([]);
@@ -15,6 +15,7 @@ const ApiPage = () => {
   const [entries, setEntries] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const totalPages = 5;
+  const [showEditModal, setShowEditModal] = useState(false);
 
   useEffect(() => {
     axios.get("http://localhost:4000/api/auth/users")
@@ -66,7 +67,6 @@ const ApiPage = () => {
     }
   };
 
-  // Fonction pour obtenir le style en fonction du rôle
   const getRoleStyle = (role) => {
     switch (role) {
       case "Admin":
@@ -83,7 +83,27 @@ const ApiPage = () => {
         return {};
     }
   };
+  const handleEditClick = (user) => {
+    setSelectedUser(user);
+    setShowEditModal(true);
+  };
 
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setSelectedUser((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSaveUser = () => {
+    axios.put(`http://localhost:4000/api/auth/users/${selectedUser._id}`, selectedUser)
+      .then(() => {
+        setUsers(users.map(user => (user._id === selectedUser._id ? selectedUser : user)));
+        setFilteredUsers(filteredUsers.map(user => (user._id === selectedUser._id ? selectedUser : user)));
+        setShowEditModal(false);
+      })
+      .catch((error) => {
+        console.error("Erreur lors de la mise à jour de l'utilisateur:", error);
+      });
+  };
   // Style pour l'en-tête du tableau en mauve
   const tableHeaderStyle = {
     backgroundColor: "#8C76F0", // Mauve
@@ -93,7 +113,7 @@ const ApiPage = () => {
   return (
     <div className="app-wrapper">
       <Header />
-      <SideBar />
+      <Sidebar />
 
       <div className="app-content">
         <main>
@@ -166,11 +186,14 @@ const ApiPage = () => {
                                 >
                                   <FaTrash />
                                 </button>
-                                <Link to={`/updatee-user/${user._id}`}>
-                                  <button type="button" className="btn btn-success btn-sm">
-                                    <FaEdit />
-                                  </button>
-                                </Link>
+                                
+                                <button
+                                  type="button"
+                                  className="btn btn-success btn-sm"
+                                  onClick={() => handleEditClick(user)}
+                                >
+                                  <FaEdit />
+                                </button>
                               </td>
                             </tr>
                           ))}
@@ -210,6 +233,52 @@ const ApiPage = () => {
           </div>
         </main>
       </div>
+
+      <Modal show={showEditModal} onHide={() => setShowEditModal(false)}>
+        <Modal.Body>
+          <h4>Modifier l'utilisateur</h4>
+          <input
+            type="text"
+            className="form-control mb-2"
+            name="firstname"
+            value={selectedUser?.firstname || ""}
+            onChange={handleInputChange}
+            placeholder="Prénom"
+          />
+          <input
+            type="text"
+            className="form-control mb-2"
+            name="lastname"
+            value={selectedUser?.lastname || ""}
+            onChange={handleInputChange}
+            placeholder="Nom"
+          />
+          <input
+            type="text"
+            className="form-control mb-2"
+            name="phone"
+            value={selectedUser?.phone || ""}
+            onChange={handleInputChange}
+            placeholder="Téléphone"
+          />
+          <input
+            type="email"
+            className="form-control mb-2"
+            name="email"
+            value={selectedUser?.email || ""}
+            onChange={handleInputChange}
+            placeholder="Email"
+          />
+          <select className="form-control" name="role" value={selectedUser?.role || ""} onChange={handleInputChange}>
+            <option value="Admin">Admin</option>
+            <option value="Guest">Guest</option>
+            <option value="Team Leader">Team Leader</option>
+            <option value="Team Member">Team Member</option>
+            <option value="Project Manager">Project Manager</option>
+          </select>
+          <Button variant="primary" onClick={handleSaveUser} className="mt-3">Sauvegarder</Button>
+        </Modal.Body>
+      </Modal>
 
       <Modal show={showDeleteModal} onHide={handleCloseDeleteModal} centered>
         <Modal.Body className="text-center">

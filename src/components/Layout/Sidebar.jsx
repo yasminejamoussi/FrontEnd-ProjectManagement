@@ -55,6 +55,13 @@ const menuConfig = {
       { label: 'Forgot Password', path: '/forgot-password' },
     ],
   },
+  role: {
+    label: 'Role Management',
+    icon: 'iconoir-eye',
+    roles: ['Admin'],
+    paths: ['/roles'],
+    subItems: [{ label: 'roles', path: '/roles' }],
+  },
 };
 
 const Sidebar = () => {
@@ -64,14 +71,13 @@ const Sidebar = () => {
   const [openMenus, setOpenMenus] = useState({});
   const location = useLocation();
 
-  // Récupération et décodage du token JWT
   useEffect(() => {
-    const jwtToken = localStorage.getItem("jwtToken");
+    const jwtToken = localStorage.getItem("token");
     if (jwtToken) {
       try {
         const decoded = jwtDecode(jwtToken);
         console.log("✅ Token décodé :", decoded);
-        setUserRole(decoded?.role || 'Guest'); // Par défaut "Guest"
+        setUserRole(decoded?.role || 'Guest'); 
       } catch (error) {
         console.error("Erreur lors du décodage du token JWT", error);
       }
@@ -193,6 +199,8 @@ const Sidebar = () => {
     notifications: { backgroundColor: isDarkMode ? '#7a3e3e' : '#ffe0e0' },
     activity: { backgroundColor: isDarkMode ? '#3e6654' : '#e0f2e9' },
     auth: { backgroundColor: isDarkMode ? '#5e3f7a' : '#f2e0f7' },
+    role: { backgroundColor: isDarkMode ? '#3b5998' : '#cce6ff' },
+
   };
 
   // Toggle menu open/close
@@ -203,7 +211,6 @@ const Sidebar = () => {
     }));
   };
 
-  // Check if a menu should be open by default based on the current path
   const isMenuOpenByDefault = useMemo(
     () => (menuId) => menuConfig[menuId].paths.some((path) => location.pathname.startsWith(path)),
     [location.pathname]

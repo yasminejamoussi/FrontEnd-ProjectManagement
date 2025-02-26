@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Card, Table, Button, ListGroup } from "react-bootstrap";
 import "../../assets/css/style.css";
 import Header from "../Layout/Header";
-import SideBar from "../Layout/SideBar";
+import Sidebar from "../Layout/Sidebar";
 import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 
@@ -12,7 +12,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     try {
-      const jwtToken = localStorage.getItem("jwtToken");
+      const jwtToken = localStorage.getItem("token");
       console.log("🔍 Token récupéré :", jwtToken);
 
       if (!jwtToken) {
@@ -59,7 +59,7 @@ const Dashboard = () => {
   return (
     <div className="app-wrapper">
       <Header />
-      <SideBar />
+      <Sidebar />
       <div className="app-content">
         <main>
           <div className="container-fluid mt-4">
