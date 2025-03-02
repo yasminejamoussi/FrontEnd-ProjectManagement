@@ -28,29 +28,34 @@ const SignIn = () => {
     e.preventDefault();
     setError("");
     setLoading(true);
-
+  
     if (!email || !password) {
       setError("Veuillez remplir tous les champs.");
       setLoading(false);
       return;
     }
-
+  
     try {
       const response = await axios.post("http://localhost:4000/api/auth/login", { email, password });
-
+      console.log("Sending login request with:", { email, password });
       if (response.status === 200) {
-        const { token, user } = response.data;
-
-        // Stocker le token et les infos utilisateur
-        localStorage.setItem("token", token);
-        localStorage.setItem("user", JSON.stringify(user));
-
-        // Rediriger vers le tableau de bord
-        navigate("/users");
+        const { token, user, message } = response.data;
+  
+        if (message === "2FA required") {
+          // Rediriger vers la page de vérification 2FA
+          navigate("/verify-2fa", { state: { email } });
+        } else {
+          // Stocker le token et les infos utilisateur
+          localStorage.setItem("token", token);
+          localStorage.setItem("user", JSON.stringify(user));
+  
+          // Rediriger vers le tableau de bord
+          navigate("/dash");
+        }
       }
     } catch (err) {
       console.error("Login error:", err);
-
+  
       if (err.response?.status === 403) {
         // Gérer le blocage de l'utilisateur
         const blockedUntil = err.response.data.message.match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);

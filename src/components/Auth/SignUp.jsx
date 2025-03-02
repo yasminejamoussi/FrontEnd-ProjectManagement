@@ -1,8 +1,9 @@
-import React, { useState,useEffect } from 'react'; 
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useGoogleLogin } from '@react-oauth/google';
-import { googleAuth, facebookAuth ,githubAuth} from '../../api'; 
-
+import { googleAuth } from '../../api';
+import { FaCopy } from "react-icons/fa"; // Import de l'icône
+import axios from 'axios';
 import "../../assets/css/style.css";
 
 const SignUp = () => {
@@ -38,6 +39,7 @@ const SignUp = () => {
 
       if (response.ok) {
         alert('Registration successful');
+        window.location.href = '/signin';
       } else {
         alert(data.message || 'Something went wrong');
       }
@@ -71,7 +73,7 @@ const SignUp = () => {
         const obj = { email, name, token, image };
         localStorage.setItem('user-info', JSON.stringify(obj));
         navigate('/users');
-      } 
+      }
     } catch (e) {
       console.log('Error while Google Login...', e);
     }
@@ -83,7 +85,46 @@ const SignUp = () => {
     flow: "auth-code",
   });
 
+  const [suggestedPassword, setSuggestedPassword] = useState('');
 
+
+  const handleSuggestPassword = async () => {
+    console.log("Bouton cliqué !");
+
+    try {
+      const response = await axios.get("http://localhost:4000/api/auth/generate-password");
+
+      setSuggestedPassword(response.data.password);
+      console.log("Mot de passe suggéré :", response.data.password);
+    } catch (error) {
+      if (error.response) {
+        console.error("Erreur lors de la suggestion du mot de passe :", error.response.data);
+        alert(error.response.data.message || "Erreur lors de la suggestion du mot de passe.");
+      } else {
+        console.error("Erreur inconnue :", error);
+        alert("Erreur inconnue lors de la suggestion du mot de passe.");
+      }
+    }
+  };
+
+  const handleCopyPassword = () => {
+    if (suggestedPassword) {
+      navigator.clipboard.writeText(suggestedPassword)
+        .then(() => {
+          console.log("Mot de passe copié :", suggestedPassword);
+          alert("Mot de passe copié !");
+        })
+        .catch(err => console.error("Erreur lors de la copie :", err));
+    }
+  };
+
+
+  const useSuggestedPassword = () => {
+    setFormData((prevData) => ({
+      ...prevData,
+      password: suggestedPassword,
+    }));
+  };
   return (
     <div className="sign-in-bg">
       <div className="app-wrapper d-block">
@@ -148,57 +189,80 @@ const SignUp = () => {
                       <div className="col-12">
                         <div className="mb-3">
                           <label className="form-label" htmlFor="email">Email</label>
-                          <input 
-                            className="form-control" 
-                            id="email" 
-                            name="email" 
-                            placeholder="Enter Your Email" 
-                            value={formData.email} 
-                            onChange={handleInputChange} 
-                            required 
-                            type="email" 
+                          <input
+                            className="form-control"
+                            id="email"
+                            name="email"
+                            placeholder="Enter Your Email"
+                            value={formData.email}
+                            onChange={handleInputChange}
+                            required
+                            type="email"
                           />
                         </div>
                       </div>
                       <div className="col-12">
                         <div className="mb-3">
                           <label className="form-label" htmlFor="phone">Phone Number</label>
-                          <input 
-                            className="form-control" 
-                            id="phone" 
-                            name="phone" 
-                            placeholder="Enter Your Phone Number" 
-                            value={formData.phone} 
-                            onChange={handleInputChange} 
-                            required 
-                            type="text" 
+                          <input
+                            className="form-control"
+                            id="phone"
+                            name="phone"
+                            placeholder="Enter Your Phone Number"
+                            value={formData.phone}
+                            onChange={handleInputChange}
+                            required
+                            type="text"
                           />
                         </div>
                       </div>
                       <div className="col-md-12">
                         <div className="mb-3">
                           <label className="form-label" htmlFor="password">Password</label>
-                          <input 
-                            className="form-control" 
-                            id="password" 
-                            name="password" 
-                            placeholder="Enter Your Password" 
-                            value={formData.password} 
-                            onChange={handleInputChange} 
-                            required 
-                            type="password" 
+                          <input
+                            className="form-control"
+                            id="password"
+                            name="password"
+                            placeholder="Enter Your Password"
+                            value={formData.password}
+                            onChange={handleInputChange}
+                            required
+                            type="password"
                           />
                         </div>
                       </div>
+
+                      {/* Bouton de suggestion de mot de passe */}
+                      <div className="col-6">
+                        <button className="btn btn-primary w-100 mb-2" type="button" onClick={handleSuggestPassword}>
+                          Suggest a Secure Password
+                        </button>
+                      </div>
+
+                      {suggestedPassword && (
+                        <div className="col-6">
+                          <div className="d-flex justify-content-between align-items-center p-3 border rounded">
+                            <span className=" text-black">{suggestedPassword}</span>
+                            <button className="btn btn-sm btn-primary" type="button" onClick={useSuggestedPassword}>
+                              Use
+                            </button>
+                            <FaCopy className="cursor-pointer hover:text-gray-800 transition"
+                              style={{ color: "#8c76f0", fontSize: "22px" }}
+                              onClick={handleCopyPassword}
+                            />
+
+                          </div>
+                        </div>
+                      )}
                       <div className="col-12">
                         <div className="form-check mb-3">
-                          <input 
-                            className="form-check-input" 
-                            id="terms" 
-                            type="checkbox" 
-                            checked={formData.terms} 
-                            onChange={handleTermsChange} 
-                            required 
+                          <input
+                            className="form-check-input"
+                            id="terms"
+                            type="checkbox"
+                            checked={formData.terms}
+                            onChange={handleTermsChange}
+                            required
                           />
                           <label className="form-check-label text-secondary" htmlFor="terms">
                             Accept Terms & Conditions
@@ -212,7 +276,7 @@ const SignUp = () => {
                       </div>
                       <div className="col-12">
                         <div className="text-center text-lg-start">
-                          Already Have An Account? <Link className="link-primary-dark text-decoration-underline" to="/">Sign in</Link>
+                          Already Have An Account? <Link className="link-primary-dark text-decoration-underline" to="/signin">Sign in</Link>
                         </div>
                       </div>
                       <div className="app-divider-v justify-content-center">
@@ -220,15 +284,15 @@ const SignUp = () => {
                       </div>
                       <div className="col-12">
                         <div className="text-center">
-                          <button className="btn btn-light-facebook icon-btn b-r-22 m-1" type="button" onClick={handleFacebookLogin}>
+                          <button className="btn btn-light-facebook icon-btn b-r-22 m-1" type="button" >
                             <i className="ti ti-brand-facebook"></i>
                           </button>
-                          <button className="btn btn-light-gmail icon-btn b-r-22 m-1" type="button" onClick={googleLogin}> 
+                          <button className="btn btn-light-gmail icon-btn b-r-22 m-1" type="button" onClick={googleLogin}>
                             <i className="ti ti-brand-google"></i>
                           </button>
-                          <button className="btn btn-light-github icon-btn b-r-22 m-1" type="button"> 
-                            <i className="ti ti-brand-github"></i> 
-                          </button> 
+                          <button className="btn btn-light-github icon-btn b-r-22 m-1" type="button">
+                            <i className="ti ti-brand-github"></i>
+                          </button>
                         </div>
                       </div>
                     </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink ,Link} from 'react-router-dom';
 import { Gear, Envelope, ChatCircleText, ShoppingBagOpen, SignOut } from '@phosphor-icons/react'; // Icônes nécessaires
 import avatar6 from '../../assets/images/ai_avtar/6.jpg';
 import womanAvatar from '../../assets/images/avtar/woman.jpg';
@@ -350,9 +350,9 @@ const Header = () => {
                         </div>
                       </li>
                       <li>
-                        <NavLink className="f-w-500 d-flex align-items-center gap-2" to="/profile" target="_blank">
+                        <Link className="f-w-500 d-flex align-items-center gap-2" to="/profile">
                           <i className="iconoir-user-love f-s-20"></i> Détails du profil
-                        </NavLink>
+                        </Link>
                       </li>
                       <li>
                         <NavLink className="f-w-500 d-flex align-items-center gap-2" to="/setting" target="_blank">
