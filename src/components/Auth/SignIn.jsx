@@ -44,6 +44,8 @@ const SignIn = () => {
   
         if (message === "2FA required") {
           // Rediriger vers la page de vérification 2FA
+          console.log("📌 Stockage de l'email dans localStorage :", email);
+          localStorage.setItem("email", email);
           navigate("/verify-2fa", { state: { email } });
         } else {
           // Stocker le token et les infos utilisateur

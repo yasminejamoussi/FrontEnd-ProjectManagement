@@ -6,7 +6,7 @@ import initializeKanbanBoard from '../../assets/js/kanban_board.js';
 import Header from "../Layout/Header";
 import Sidebar from "../Layout/Sidebar";
 import { jwtDecode } from "jwt-decode";
-import { BarChart,  Bar,  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,} from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, } from 'recharts';
 import Modal from 'react-bootstrap/Modal'; // Import Modal from react-bootstrap
 import Button from 'react-bootstrap/Button'; // Import Button for the close button
 
@@ -35,6 +35,7 @@ const KanbanBoard = () => {
     dueDate: '',
   });
   const [editTask, setEditTask] = useState(null);
+  const [suggestedDueDate, setSuggestedDueDate] = useState(null);
   const gridsRef = useRef(null);
   const boardRef = useRef(null);
 
@@ -154,6 +155,51 @@ const KanbanBoard = () => {
     } catch (err) {
       console.error("AI prioritization error:", err);
       setError("Failed to get AI suggestion: " + (err.response?.data?.error || err.message));
+    }
+  };
+  //predicttask
+  const predictTaskDuration = async () => {
+    const task = editTask || newTask;
+    console.log("Début de predictTaskDuration, task:", task); // Log 1
+    if (!task.title || !task.startDate) {
+      setError("Veuillez entrer un titre et une date de début avant de demander une prédiction.");
+      console.log("Erreur: titre ou startDate manquant"); // Log 2
+      return;
+    }
+    try {
+      const token = localStorage.getItem("token");
+      console.log("Token:", token); // Log 3
+      console.log("Envoi de la requête POST avec:", {
+        title: task.title,
+        description: task.description || '',
+        status: task.status,
+        priority: task.priority,
+        assignedTo: task.assignedTo,
+        project: projectId,
+        startDate: task.startDate,
+      }); // Log 4
+      const response = await axios.post('http://localhost:4000/api/tasks/predict-duration', {
+        title: task.title,
+        description: task.description || '',
+        status: task.status,
+        priority: task.priority,
+        assignedTo: task.assignedTo,
+        project: projectId,
+        startDate: task.startDate,
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      console.log("Réponse de l’API:", response.data); // Log 5
+      const { estimatedDueDate } = response.data;
+      setSuggestedDueDate(estimatedDueDate.split('T')[0]);
+      if (editTask) {
+        setEditTask(prev => ({ ...prev, dueDate: estimatedDueDate.split('T')[0] }));
+      } else {
+        setNewTask(prev => ({ ...prev, dueDate: estimatedDueDate.split('T')[0] }));
+      }
+    } catch (err) {
+      console.error("Erreur dans predictTaskDuration:", err); // Log 6
+      setError("Échec de la prédiction : " + (err.response?.data?.error || err.message));
     }
   };
   ///////////////graph 
@@ -283,7 +329,7 @@ const KanbanBoard = () => {
                   <button className="btn btn-primary ms-3" onClick={() => { setShowForm(true); setEditTask(null); }}>
                     <i className="ti ti-plus"></i> Add Task
                   </button>
-                  <button 
+                  <button
                     className="btn btn-success ms-3"
                     onClick={handleGenerateChart}
                     disabled={productivityLoading}
@@ -385,6 +431,14 @@ const KanbanBoard = () => {
                             value={editTask ? editTask.dueDate : newTask.dueDate}
                             onChange={handleInputChange}
                           />
+                          {/* Ajout du bouton juste après le champ existant */}
+                          <button
+                            type="button"
+                            className="btn btn-info mt-2"
+                            onClick={predictTaskDuration}
+                          >
+                            Suggérer une durée avec IA
+                          </button>
                         </div>
                         <div className="mb-3">
                           <label className="form-label">Assigned To</label>
@@ -479,9 +533,9 @@ const KanbanBoard = () => {
               </div>
             </div>
 
-{/* Remove the chart section here, as it will be in the modal */}
+            {/* Remove the chart section here, as it will be in the modal */}
 
-{productivityLoading && <div className="loader-wrapper"><div className="loader_16"></div></div>}
+            {productivityLoading && <div className="loader-wrapper"><div className="loader_16"></div></div>}
             {productivityError && <div className="alert alert-danger mt-3">{productivityError}</div>}
 
             {/* Modal to display the productivity chart */}
@@ -504,33 +558,33 @@ const KanbanBoard = () => {
                         <ResponsiveContainer width="100%" height={300}>
                           <BarChart data={[item]} margin={{ top: 20, right: 30, left: 20, bottom: 50 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                            <XAxis 
-                              dataKey="project" 
-                              type="category" 
+                            <XAxis
+                              dataKey="project"
+                              type="category"
                               hide={true} // Hide the X-axis for a generic chart
                               allowDuplicatedCategory={false}
                             />
-                            <YAxis 
+                            <YAxis
                               label={{ value: 'Value', angle: -90, position: 'insideLeft', offset: 10, style: { textAnchor: 'middle' } }}
                             />
-                            <Tooltip 
+                            <Tooltip
                               contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)' }}
                               itemStyle={{ color: '#333' }}
                             />
-                            <Legend 
+                            <Legend
                               wrapperStyle={{ paddingTop: '10px' }}
                               iconType="circle"
                             />
-                            <Bar 
-                              dataKey="totalTasksCompleted" 
+                            <Bar
+                              dataKey="totalTasksCompleted"
                               fill="#4CAF50" // Green for completed tasks
                               name="Completed Tasks"
                               animationBegin={300}
                               animationDuration={1500}
                               animationEasing="ease-out"
                             />
-                            <Bar 
-                              dataKey="score" 
+                            <Bar
+                              dataKey="score"
                               fill="#2196F3" // Blue for productivity score
                               name="Productivity Score"
                               animationBegin={300}
@@ -554,7 +608,6 @@ const KanbanBoard = () => {
                 </Button>
               </Modal.Footer>
             </Modal>
-
           </div>
         </main>
         <div className="go-top">

@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { NavLink ,Link} from 'react-router-dom';
-import { Gear, Envelope, ChatCircleText, ShoppingBagOpen, SignOut } from '@phosphor-icons/react'; // Icônes nécessaires
-import avatar6 from '../../assets/images/ai_avtar/6.jpg';
+import { NavLink, Link } from 'react-router-dom';
+import { Gear, Envelope, ChatCircleText, ShoppingBagOpen, SignOut } from '@phosphor-icons/react';
+import axios from 'axios'; // Ajouté pour les requêtes API
 import womanAvatar from '../../assets/images/avtar/woman.jpg';
 import checkIcon from '../../assets/images/profile-app/01.png';
 
 const Header = () => {
-  const [openPanel, setOpenPanel] = useState(null); // Utilise un seul état pour gérer tous les onglets
+  const [openPanel, setOpenPanel] = useState(null);
   const [darkMode, setDarkMode] = useState(false);
+  const [notifications, setNotifications] = useState([]); // Nouvel état pour les notifications de retard
 
-  // Références pour les offcanvas
   const searchRef = useRef(null);
   const appsRef = useRef(null);
   const notificationsRef = useRef(null);
@@ -18,20 +18,47 @@ const Header = () => {
   // Toggle mode sombre
   const toggleDarkMode = () => {
     setDarkMode(!darkMode);
-    document.body.classList.toggle('dark-mode', !darkMode); // Ajoute/enlève la classe pour le mode sombre
+    document.body.classList.toggle('dark-mode', !darkMode);
   };
 
-  // Fonction pour ouvrir/fermer un onglet spécifique (ferme automatiquement les autres)
+  // Récupération des projets et prédictions au chargement
+  useEffect(() => {
+    const fetchDelayPredictions = async () => {
+      try {
+        const projectsResponse = await axios.get('http://localhost:4000/api/projects');
+        const projects = projectsResponse.data;
+
+        const delayPromises = projects.map(async (project) => {
+          const delayResponse = await axios.get(`http://localhost:4000/api/projects/${project._id}/predict-delay`);
+          return {
+            projectId: project._id,
+            projectName: project.name,
+            riskOfDelay: delayResponse.data.riskOfDelay,
+            delayDays: delayResponse.data.delayDays,
+            status: project.status,
+            endDate: project.endDate,
+          };
+        });
+
+        const delayResults = await Promise.all(delayPromises);
+        const delayNotifications = delayResults.filter(result => result.riskOfDelay === 'Oui');
+        setNotifications(delayNotifications);
+      } catch (error) {
+        console.error('Erreur lors de la récupération des prédictions :', error);
+      }
+    };
+
+    fetchDelayPredictions();
+  }, []);
+
   const togglePanel = (panel) => {
-    setOpenPanel((current) => (current === panel ? null : panel)); // Si le panneau est déjà ouvert, le fermer ; sinon, l’ouvrir
+    setOpenPanel((current) => (current === panel ? null : panel));
   };
 
-  // Fonction pour fermer tous les offcanvas
   const closeOffcanvas = () => {
     setOpenPanel(null);
   };
 
-  // Fonction pour fermer les offcanvas en cliquant à l’extérieur
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
@@ -44,33 +71,30 @@ const Header = () => {
       }
     };
 
-    // Ajoute l’écouteur d’événements quand un offcanvas est ouvert
     if (openPanel) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
-    // Nettoie l’écouteur d’événements quand les offcanvas sont fermés
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [openPanel]);
 
-  // Fonction pour gérer le clic sur les boutons d’ouverture (évite les comportements par défaut)
   const handleOpenClick = (e, panel) => {
     e.preventDefault();
     togglePanel(panel);
+  };
+
+  // Formater la date
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('fr-FR');
   };
 
   return (
     <header className="header-main">
       <div className="container-fluid">
         <div className="row">
-          {/* Partie gauche (supprimé le bouton toggle) */}
-          <div className="col-6 col-sm-4 d-flex align-items-center header-left p-0">
-            {/* Bouton toggle enlevé */}
-          </div>
-
-          {/* Partie droite */}
+          <div className="col-6 col-sm-4 d-flex align-items-center header-left p-0"></div>
           <div className="col-6 col-sm-8 d-flex align-items-center justify-content-end header-right p-0">
             <ul className="d-flex align-items-center list-unstyled">
               {/* Barre de recherche */}
@@ -251,7 +275,9 @@ const Header = () => {
                   aria-label="Ouvrir les notifications"
                 >
                   <i className="iconoir-bell"></i>
-                  <span className="position-absolute translate-middle p-1 bg-success border border-light rounded-circle animate__animated animate__fadeIn animate__infinite animate__slower"></span>
+                  {notifications.length > 0 && (
+                    <span className="position-absolute translate-middle p-1 bg-success border border-light rounded-circle animate__animated animate__fadeIn animate__infinite animate__slower"></span>
+                  )}
                 </a>
                 <div
                   className={`offcanvas offcanvas-end header-notification-canvas ${openPanel === 'notifications' ? 'show' : ''}`}
@@ -260,7 +286,7 @@ const Header = () => {
                   aria-hidden={openPanel !== 'notifications'}
                 >
                   <div className="offcanvas-header">
-                    <h5 className="offcanvas-title">Notifications</h5>
+                    <h5 className="offcanvas-title">Notifications ({notifications.length})</h5>
                     <button
                       className="btn-close"
                       onClick={closeOffcanvas}
@@ -268,30 +294,30 @@ const Header = () => {
                     ></button>
                   </div>
                   <div className="offcanvas-body notification-offcanvas-body app-scroll p-0">
-                    <div className="head-container notification-head-container">
-                      <div className="notification-message head-box">
-                        <div className="message-images">
-                          <span className="bg-secondary h-35 w-35 d-flex-center b-r-10 position-relative">
-                            <img
-                              alt="avtar"
-                              className="img-fluid b-r-10"
-                              src={avatar6}
-                            />
-                          </span>
-                        </div>
-                        <div className="message-content-box flex-grow-1 ps-2">
-                          <NavLink to="/read-email" className="f-s-15 text-secondary mb-0" target="_blank">
-                            <span className="f-w-500 text-secondary">Gene Hart</span> veut modifier{' '}
-                            <span className="f-w-500 text-secondary">Report.doc</span>
-                          </NavLink>
-                          <div>
-                            <a className="d-inline-block f-w-500 text-success me-1" href="#">Approuver</a>
-                            <a className="d-inline-block f-w-500 text-danger" href="#">Refuser</a>
-                          </div>
-                          <span className="badge text-light-primary mt-2">23 sept.</span>
-                        </div>
+                    {notifications.length === 0 ? (
+                      <div className="head-container notification-head-container p-3">
+                        <p className="text-muted">Aucun projet en retard pour le moment.</p>
                       </div>
-                    </div>
+                    ) : (
+                      notifications.map((notif) => (
+                        <div key={notif.projectId} className="head-container notification-head-container">
+                          <div className="notification-message head-box">
+                            <div className="message-images">
+                              <span className="bg-secondary h-35 w-35 d-flex-center b-r-10 position-relative">
+                                <i className="ti ti-alert-triangle text-warning"></i>
+                              </span>
+                            </div>
+                            <div className="message-content-box flex-grow-1 ps-2">
+                              <NavLink to={`/project-details/${notif.projectId}`} className="f-s-15 text-secondary mb-0">
+                                <span className="f-w-500 text-secondary">{notif.projectName}</span> is at risk of a delay of{' '}
+                                <span className="f-w-500 text-danger">{notif.delayDays} days</span>
+                              </NavLink>
+                              <p className="f-s-13 mb-0 text-secondary">Status: {notif.status} | End: {formatDate(notif.endDate)}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               </li>
