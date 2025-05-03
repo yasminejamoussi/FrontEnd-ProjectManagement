@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import initializeKanbanBoard from '../../assets/js/kanban_board.js';
 import Header from "../Layout/Header";
-import Sidebar from "../Layout/Sidebar";
+import Sidebar from "../Layout/SideBar";
 import { jwtDecode } from "jwt-decode";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, } from 'recharts';
 import Modal from 'react-bootstrap/Modal'; // Import Modal from react-bootstrap

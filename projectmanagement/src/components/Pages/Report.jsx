@@ -7,7 +7,7 @@ import html2canvas from 'html2canvas';
 import Papa from 'papaparse';
 import LogoBlanc from '../../assets/images/logo/LogoNoir.png';
 import Header from '../Layout/Header';
-import Sidebar from '../Layout/Sidebar';
+import Sidebar from "../Layout/SideBar";
 import '../../assets/css/Report.css';
 
 ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);

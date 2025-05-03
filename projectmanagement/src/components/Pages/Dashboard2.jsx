@@ -3,7 +3,7 @@ import Chart from 'react-apexcharts';
 import { Clock, CircleDashed, Cloud, FileX, Circle, Ticket, ArrowUp, X } from 'lucide-react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
-import Sidebar from '../Layout/Sidebar'; // Adjust path
+import Sidebar from "../Layout/SideBar";
 import Header from '../Layout/Header'; // Adjust path
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { useNavigate } from 'react-router-dom'; 

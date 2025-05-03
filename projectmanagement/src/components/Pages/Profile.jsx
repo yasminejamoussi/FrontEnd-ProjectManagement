@@ -5,7 +5,7 @@ import '../../assets/vendor/glightbox/glightbox.min.css';
 import '../../assets/vendor/apexcharts/apexcharts.css';
 import '../../assets/vendor/select/select2.min.css';
 import Header from "../Layout/Header";
-import SideBar from "../Layout/Sidebar";
+import Sidebar from "../Layout/SideBar";
 import UserProfileForm from "../Pages/UserProfileForm";
 
 const Profile = ({ userId }) => {

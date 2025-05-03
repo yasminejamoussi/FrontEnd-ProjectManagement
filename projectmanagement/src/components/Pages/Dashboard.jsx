@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Card, Table, Button, ListGroup } from "react-bootstrap";
 import "../../assets/css/style.css";
 import Header from "../Layout/Header";
-import Sidebar from "../Layout/Sidebar";
+import Sidebar from "../Layout/SideBar";
 import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 

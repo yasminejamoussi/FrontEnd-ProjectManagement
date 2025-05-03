@@ -13,7 +13,7 @@ import LandingPage from "./components/Pages/LandingPage.jsx";
 import Profile from "./components/Pages/Profile.jsx";
 import TwoFactorAuth from "./components/Auth/TwoFactorAuth.jsx";
 import Dashboard from "./components/Pages/Dashboard.jsx";
-import Sidebar from "./components/Layout/Sidebar.jsx";
+import Sidebar from "./components/Layout/SideBar.jsx";
 import RoleManagement from "./components/Pages/RoleManagement.jsx";
 import ProjectsDashboard from "./components/Pages/ProjectsDashboard.jsx";
 import ProjectDetails from "./components/Pages/ProjectDetails.jsx";
