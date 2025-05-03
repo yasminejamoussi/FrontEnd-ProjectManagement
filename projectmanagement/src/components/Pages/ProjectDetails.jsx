@@ -4,7 +4,7 @@ import { NavLink, useParams } from 'react-router-dom';
 import { Stack } from '@phosphor-icons/react';
 import axios from 'axios';
 import Header from "../Layout/Header";
-import Sidebar from "../Layout/Sidebar";
+import Sidebar from "../Layout/SideBar";
 import avatar7 from '../../assets/images/avtar/7.png';
 import avatar13 from '../../assets/images/avtar/13.png';
 import avatar16 from '../../assets/images/avtar/16.png';
