@@ -12,7 +12,6 @@ import UpdateUser from "./components/Pages/UpdateUser.jsx";
 import LandingPage from "./components/Pages/LandingPage.jsx";
 import Profile from "./components/Pages/Profile.jsx";
 import TwoFactorAuth from "./components/Auth/TwoFactorAuth.jsx";
-import Dashboard from "./components/Pages/Dashboard.jsx";
 import Sidebar from "./components/Layout/Sidebar.jsx";
 import RoleManagement from "./components/Pages/RoleManagement.jsx";
 import ProjectsDashboard from "./components/Pages/ProjectsDashboard.jsx";
@@ -20,6 +19,10 @@ import ProjectDetails from "./components/Pages/ProjectDetails.jsx";
 import KanbanBoard from "./components/Pages/KanbanBoard.jsx";
 import Dashboardd from "./components/Pages/Dashboard2.jsx";
 import Report from "./components/Pages/Report.jsx";
+import TeamPage from "./components/Pages/TeamPage.jsx";
+import TasksPage from "./components/Pages/TasksPage.jsx";
+import ActivityLogs from "./components/Pages/ActivityLogs.jsx";
+import NotificationsPage from "./components/Pages/NotificationsPage.jsx";
 
 const GoogleWrapper = () => (
   <GoogleOAuthProvider clientId="153025115557-h7inq3asri2bcbk1pvpd26hafkikje3o.apps.googleusercontent.com">
@@ -43,7 +46,6 @@ function App() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/" element={<LandingPage />} />
           <Route path="/verify-2fa" element={<TwoFactorAuth />} />
-          <Route path="/dash" element={<Dashboard />} />
           <Route path="/side" element={<Sidebar />} />
           <Route path="/roles" element={<RoleManagement />} />
           <Route path="/projects" element={<ProjectsDashboard />} />
@@ -52,6 +54,10 @@ function App() {
           <Route path="/kanban/:projectId?" element={<KanbanBoard />} />
           <Route path="/dashboard" element={<Dashboardd/>} />
           <Route path="/report" element={<Report/>} />
+          <Route path="/team" element={<TeamPage/>} />
+          <Route path="/tasksusers" element={<TasksPage/>} />
+          <Route path="/activitylogs" element={<ActivityLogs/>} />
+          <Route path="/notifications" element={<NotificationsPage />} />
         </Routes>
       </Router>
     </HelmetProvider>  

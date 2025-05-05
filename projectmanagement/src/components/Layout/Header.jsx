@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { NavLink, Link } from 'react-router-dom';
 import { Gear, Envelope, ChatCircleText, ShoppingBagOpen, SignOut } from '@phosphor-icons/react';
 import axios from 'axios';
-import womanAvatar from '../../assets/images/avtar/woman.jpg';
+import womanAvatar from '../../assets/images/avtar/user.jpg';
 import checkIcon from '../../assets/images/profile-app/01.png';
 
 const Header = () => {
@@ -35,13 +35,13 @@ const Header = () => {
       console.error('Erreur fetchUsers :', error);
     }
   };
+
   const suggestUser = async () => {
     try {
       const response = await axios.get('http://localhost:4000/api/tasks/user-task-counts');
-      const userTaskCounts = response.data.userTaskAnalysis; // Accéder à userTaskAnalysis
+      const userTaskCounts = response.data.userTaskAnalysis;
       console.log('Comptes de tâches des utilisateurs :', userTaskCounts);
   
-      // Filtrer les utilisateurs pour exclure ceux qui sont "Overloaded"
       const availableUsers = userTaskCounts.filter(user => user.workloadStatus !== 'Overloaded');
   
       if (availableUsers.length === 0) {
@@ -51,7 +51,6 @@ const Header = () => {
         return;
       }
   
-      // Parmi les utilisateurs disponibles, trouver celui avec le workloadScore le plus bas
       const suggested = availableUsers.reduce((prev, curr) =>
         prev.workloadScore < curr.workloadScore ? prev : curr
       );
@@ -68,11 +67,38 @@ const Header = () => {
 
   const fetchNotifications = async () => {
     try {
-      console.log('Récupération des projets...');
-      const projectsResponse = await axios.get('http://localhost:4000/api/projects');
-      console.log('Projets reçus :', projectsResponse.data);
-      const projects = projectsResponse.data;
+      console.log('Récupération des notifications...');
+      if (!userProfile || !userProfile.role || !userProfile._id) {
+        console.warn('Profil utilisateur ou rôle non chargé');
+        return;
+      }
 
+      const { role, _id: userId } = userProfile;
+      console.log('Rôle utilisateur :', role.name, 'ID utilisateur :', userId);
+
+      // Récupérer les projets
+      let projects = [];
+      if (role.name === 'Admin') {
+        const projectsResponse = await axios.get('http://localhost:4000/api/projects');
+        projects = projectsResponse.data;
+        console.log('Projets reçus (Admin) :', projects.length);
+      } else if (['Project Manager', 'Team Leader', 'Team Member'].includes(role.name)) {
+        const projectsResponse = await axios.get('http://localhost:4000/api/projects', {
+          params: {
+            projectManager: userId,
+            teamMembers: userId
+          }
+        });
+        console.log('Requête projets envoyée avec params :', { projectManager: userId, teamMembers: userId });
+        projects = projectsResponse.data;
+        console.log('Projets reçus (Utilisateur) :', projects.length, projects.map(p => ({
+          name: p.name,
+          projectManager: p.projectManager,
+          teamMembers: p.teamMembers
+        })));
+      }
+
+      // Prédire les retards des projets
       const projectDelayPromises = projects.map(async (project) => {
         try {
           const delayResponse = await axios.get(`http://localhost:4000/api/projects/${project._id}/predict-delay`);
@@ -92,11 +118,59 @@ const Header = () => {
         }
       });
 
-      console.log('Récupération des tâches...');
-      const tasksResponse = await axios.get('http://localhost:4000/api/tasks');
-      console.log('Tâches reçues :', tasksResponse.data);
-      const tasks = tasksResponse.data;
+      // Récupérer les tâches
+      let tasks = [];
+      if (role.name === 'Admin') {
+        // Admin voit toutes les tâches
+        const tasksResponse = await axios.get('http://localhost:4000/api/tasks');
+        tasks = tasksResponse.data;
+        console.log('Tâches reçues (Admin) :', tasks.length);
+      } else if (role.name === 'Project Manager') {
+        // Project Manager : toutes les tâches des projets qu'ils gèrent
+        const projectIds = projects
+          .filter(project => {
+            let isManager = false;
+            if (project.projectManager) {
+              isManager = typeof project.projectManager === 'object' && project.projectManager?._id
+                ? project.projectManager._id.toString() === userId
+                : project.projectManager.toString() === userId;
+            }
+            console.log(`Projet ${project.name} - projectManager:`, project.projectManager, 'teamMembers:', project.teamMembers, 'isManager:', isManager);
+            return isManager;
+          })
+          .map(project => project._id);
+        console.log('IDs des projets gérés :', projectIds);
+        if (projectIds.length > 0) {
+          const tasksResponse = await axios.get('http://localhost:4000/api/tasks', {
+            params: { projectId: projectIds }
+          });
+          console.log('Requête tâches envoyée avec params :', { projectId: projectIds });
+          tasks = tasksResponse.data;
+          console.log('Tâches reçues (Project Manager) :', tasks.length, tasks.map(t => t.title));
+        } else {
+          console.log('Aucun projet géré trouvé pour ce Project Manager.');
+          // Fallback: If project is returned but not managed, try fetching tasks for all projects
+          const allProjectIds = projects.map(project => project._id);
+          if (allProjectIds.length > 0) {
+            console.log('Fallback: Récupération des tâches pour tous les projets retournés :', allProjectIds);
+            const tasksResponse = await axios.get('http://localhost:4000/api/tasks', {
+              params: { projectId: allProjectIds }
+            });
+            tasks = tasksResponse.data;
+            console.log('Tâches reçues (Fallback) :', tasks.length, tasks.map(t => t.title));
+          }
+        }
+      } else if (['Team Leader', 'Team Member'].includes(role.name)) {
+        // Team Leader/Team Member : tâches assignées à l'utilisateur
+        const tasksResponse = await axios.get('http://localhost:4000/api/tasks', {
+          params: { assignedTo: userId }
+        });
+        console.log('Requête tâches envoyée avec params :', { assignedTo: userId });
+        tasks = tasksResponse.data;
+        console.log('Tâches reçues (Utilisateur) :', tasks.length, tasks.map(t => t.title));
+      }
 
+      // Prédire les retards des tâches
       const taskDelayPromises = tasks.map(async (task) => {
         try {
           const delayResponse = await axios.get(`http://localhost:4000/api/tasks/${task._id}/predict-delay`);
@@ -133,9 +207,32 @@ const Header = () => {
   };
 
   useEffect(() => {
-    fetchNotifications();
-    fetchUsers();
+    const fetchUserProfile = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        console.error("Missing token");
+        return;
+      }
+
+      try {
+        const response = await axios.get("http://localhost:4000/api/profile", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setUserProfile(response.data);
+      } catch (error) {
+        console.error("Error fetching profile in Header:", error);
+      }
+    };
+
+    fetchUserProfile();
   }, []);
+
+  useEffect(() => {
+    if (userProfile) {
+      fetchNotifications();
+      fetchUsers();
+    }
+  }, [userProfile]);
 
   const togglePanel = (panel) => {
     setOpenPanel((current) => (current === panel ? null : panel));
@@ -215,27 +312,6 @@ const Header = () => {
       alert('Erreur lors de la mise à jour de la tâche.');
     }
   };
-  // 📌 Ajout dans useEffect (à placer au bon endroit en haut)
-useEffect(() => {
-  const fetchUserProfile = async () => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      console.error("Missing token");
-      return;
-    }
-
-    try {
-      const response = await axios.get("http://localhost:4000/api/profile", {
-        headers: { Authorization:` Bearer ${token}` },
-      });
-      setUserProfile(response.data); // stocke les données de profil récupérées
-    } catch (error) {
-      console.error("Error fetching profile in Header:", error);
-    }
-  };
-
-  fetchUserProfile();
-}, []);
 
   return (
     <header className="header-main">
@@ -491,90 +567,76 @@ useEffect(() => {
               </li>
 
               {/* Profil */}
-              {/* Profile section */}
-            <li className="header-profile">
-              <a
-                className="d-block head-icon"
-                href="#"
-                onClick={(e) => handleOpenClick(e, 'profile')}
-                role="button"
-                aria-label="Open profile"
-              >
-                {/* 🔁 Avatar dynamique depuis la BDD (fallback vers image par défaut) */}
-                <img
-                  alt="avatar"
-                  className="b-r-50 h-35 w-35 bg-dark"
-                  src={userProfile?.profileImage || womanAvatar}
-                />
-              </a>
-
-              <div
-                className={`offcanvas offcanvas-end header-profile-canvas ${openPanel === 'profile' ? 'show' : ''}`}
-                tabIndex="-1"
-                ref={profileRef}
-                aria-hidden={openPanel !== 'profile'}
-              >
-                <div className="offcanvas-header">
-                  <h5 className="offcanvas-title">Profile</h5>
-                  <button
-                    className="btn-close"
-                    onClick={closeOffcanvas}
-                    aria-label="Close profile"
-                  ></button>
+              <li className="header-profile">
+                <a
+                  className="d-block head-icon"
+                  href="#"
+                  onClick={(e) => handleOpenClick(e, 'profile')}
+                  role="button"
+                  aria-label="Open profile"
+                >
+                  <img
+                    alt="avatar"
+                    className="b-r-50 h-35 w-35 bg-dark"
+                    src={userProfile?.profileImage || womanAvatar}
+                  />
+                </a>
+                <div
+                  className={`offcanvas offcanvas-end header-profile-canvas ${openPanel === 'profile' ? 'show' : ''}`}
+                  tabIndex="-1"
+                  ref={profileRef}
+                  aria-hidden={openPanel !== 'profile'}
+                >
+                  <div className="offcanvas-header">
+                    <h5 className="offcanvas-title">Profile</h5>
+                    <button
+                      className="btn-close"
+                      onClick={closeOffcanvas}
+                      aria-label="Close profile"
+                    ></button>
+                  </div>
+                  <div className="offcanvas-body app-scroll">
+                    <ul className="list-unstyled">
+                      <li className="d-flex gap-3 mb-3">
+                        <div className="d-flex-center">
+                          <span className="h-45 w-45 d-flex-center b-r-10 position-relative">
+                            <img
+                              alt="avatar"
+                              className="img-fluid b-r-10"
+                              src={userProfile?.profileImage || womanAvatar}
+                            />
+                          </span>
+                        </div>
+                        <div className="text-center mt-2">
+                          <h6 className="mb-0">
+                            {userProfile?.firstname && userProfile?.lastname
+                              ? `${userProfile.firstname} ${userProfile.lastname}`
+                              : "Unknown Name"} <img alt="verified" className="w-20 h-20" src={checkIcon} />
+                          </h6>
+                          <p className="f-s-12 mb-0 text-secondary">
+                            {userProfile?.email || "Unknown Email"}
+                          </p>
+                        </div>
+                      </li>
+                      <li>
+                        <Link className="f-w-500 d-flex align-items-center gap-2" to="/profile">
+                          <i className="iconoir-user-love f-s-20"></i> Profile Details
+                        </Link>
+                      </li>
+                      
+                      <li>
+                        <NavLink
+                          className="mb-0 btn btn-light-danger btn-sm d-flex align-items-center justify-content-center gap-2"
+                          to="/signin"
+                          onClick={closeOffcanvas}
+                        >
+                          <SignOut size={20} className="ph-duotone" /> Logout
+                        </NavLink>
+                      </li>
+                    </ul>
+                  </div>
                 </div>
-
-                <div className="offcanvas-body app-scroll">
-                  <ul className="list-unstyled">
-                    <li className="d-flex gap-3 mb-3">
-                      <div className="d-flex-center">
-                        <span className="h-45 w-45 d-flex-center b-r-10 position-relative">
-                          {/* 🔁 Avatar dynamique */}
-                          <img
-                            alt="avatar"
-                            className="img-fluid b-r-10"
-                            src={userProfile?.profileImage || womanAvatar}
-                          />
-                        </span>
-                      </div>
-                      <div className="text-center mt-2">
-                        {/* 🔁 Nom et email dynamiques */}
-                        <h6 className="mb-0">
-              {userProfile?.firstname && userProfile?.lastname
-                ? `${userProfile.firstname} ${userProfile.lastname}`
-                : "Unknown Name"}{' '}
-              <img alt="verified" className="w-20 h-20" src={checkIcon} />
-            </h6>
-
-                        <p className="f-s-12 mb-0 text-secondary">
-                          {userProfile?.email || "Unknown Email"}
-                        </p>
-                      </div>
-                    </li>
-
-                    {/* Menu options */}
-                    <li>
-                      <Link className="f-w-500 d-flex align-items-center gap-2" to="/profile">
-                        <i className="iconoir-user-love f-s-20"></i> Profile Details
-                      </Link>
-                    </li>
-                    <li>
-                      <NavLink className="f-w-500 d-flex align-items-center gap-2" to="/setting" target="_blank">
-                        <i className="iconoir-settings f-s-20"></i> Settings
-                      </NavLink>
-                    </li>
-                    <li>
-                      <NavLink
-                        className="mb-0 btn btn-light-danger btn-sm d-flex align-items-center justify-content-center gap-2"
-                        to="/signin"
-                        onClick={closeOffcanvas}
-                      >
-                        <SignOut size={20} className="ph-duotone" /> Logout
-                      </NavLink>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </li>
+              </li>
             </ul>
           </div>
         </div>
@@ -586,7 +648,7 @@ useEffect(() => {
           <div className="modal-dialog">
             <div className="modal-content">
               <div className="modal-header">
-                <h5 className="modal-title">Modifier la tâche</h5>
+                <h5 className="modal-title">Update Task</h5>
                 <button type="button" className="btn-close" onClick={closeModal} />
               </div>
               <form onSubmit={handleUpdateTask}>
@@ -607,7 +669,7 @@ useEffect(() => {
                       value={newAssignee}
                       onChange={(e) => setNewAssignee(e.target.value)}
                     >
-                      <option value="">Sélectionner un membre</option>
+                      <option value="">Select a member</option>
                       {users.map((user) => (
                         <option key={user._id} value={user._id}>
                           {user.firstname} {user.lastname}{' '}
@@ -617,7 +679,7 @@ useEffect(() => {
                     </select>
                     {suggestedUser && (
                       <p className="text-muted mt-1">
-                       AI thinks {suggestedUser.firstname} could help! (Assigned tasks: {suggestedUser.taskCount})
+                        AI thinks {suggestedUser.firstname} could help! (Assigned tasks: {suggestedUser.taskCount})
                       </p>
                     )}
                   </div>

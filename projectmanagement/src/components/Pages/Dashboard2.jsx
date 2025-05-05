@@ -1,35 +1,536 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Chart from 'react-apexcharts';
-import { Clock, CircleDashed, Cloud, FileX, Circle, Ticket, ArrowUp, X } from 'lucide-react';
+import { CircleDashed, CheckCircle, PlayCircle, PauseCircle, Circle, ArrowUp, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
-import Sidebar from '../Layout/Sidebar'; // Adjust path
-import Header from '../Layout/Header'; // Adjust path
+import Sidebar from '../Layout/Sidebar';
+import Header from '../Layout/Header';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { useNavigate } from 'react-router-dom'; 
-// Import Images
-import Avatar2 from '../../assets/images/avtar/2.png';
-import Avatar3 from '../../assets/images/avtar/3.png';
-import Avatar4 from '../../assets/images/avtar/4.png';
-import Avatar5 from '../../assets/images/avtar/5.png';
-import Avatar6 from '../../assets/images/avtar/6.png';
-import Avatar7 from '../../assets/images/avtar/7.png';
-import Avatar8 from '../../assets/images/avtar/8.png';
-import CelebrationGif from '../../assets/images/dashboard/ecommerce-dashboard/celebration.gif';
-import WelcomeImage from '../../assets/images/modals/welcome-1.png';
+import { useNavigate } from 'react-router-dom';
+import Avatar4 from '../../assets/images/avtar/user.jpg';
+import axios from 'axios';
+import { Modal, Button, Form } from 'react-bootstrap';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import DOMPurify from 'dompurify';
 
-const Dashboardd = () => {
+const Dashboard = () => {
   const [loading, setLoading] = useState(true);
+  const [userData, setUserData] = useState(null);
+  const [role, setRole] = useState(null);
+  const [allProjects, setAllProjects] = useState([]);
+  const [allTasks, setAllTasks] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
+  const [calendarEvents, setCalendarEvents] = useState([]);
+  const [showModal, setShowModal] = useState(false);
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [dateRange, setDateRange] = useState({ min: null, max: null });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [taskForm, setTaskForm] = useState({ title: '', description: '', startDate: '', dueDate: '', status: '', priority: '' });
+  const projectsPerPage = 10;
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 1000);
-    return () => clearTimeout(timer);
-  }, []);
+    const token = localStorage.getItem('token');
+    if (!token) {
+      navigate('/login');
+      return;
+    }
 
-  const navigate = useNavigate();
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+
+        const [userResponse, projectsResponse, tasksResponse, usersResponse] = await Promise.all([
+          axios.get('http://localhost:4000/api/profile', {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          axios.get('http://localhost:4000/api/projects', {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          axios.get('http://localhost:4000/api/tasks', {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          axios.get('http://localhost:4000/api/auth/users', {
+            headers: { Authorization: `Bearer ${token}` },
+          }).catch(() => ({ data: [] })),
+        ]);
+
+        const user = userResponse.data;
+        setUserData(user);
+        setRole(user.role.name);
+
+        const projects = projectsResponse.data || [];
+        setAllProjects(projects);
+
+        let relevantProjects = projects;
+        if (user.role.name === 'Project Manager') {
+          relevantProjects = projects.filter(
+            (project) => project.projectManager?._id === user._id
+          );
+        } else if (user.role.name === 'Team Leader' || user.role.name === 'Team Member') {
+          relevantProjects = projects.filter(
+            (project) =>
+              project.projectManager?._id === user._id ||
+              project.teamMembers?.some((member) => member._id === user._id)
+          );
+        } else if (user.role.name === 'Guest') {
+          relevantProjects = [];
+        }
+
+        const formattedEvents = relevantProjects
+          .map((project) => {
+            const startDate = new Date(project.startDate);
+            if (isNaN(startDate.getTime())) {
+              console.error('Invalid date for project:', project);
+              return null;
+            }
+            return {
+              title: DOMPurify.sanitize(project.name),
+              date: startDate.toISOString().split('T')[0],
+              projectDetails: project,
+            };
+          })
+          .filter((event) => event !== null);
+        setCalendarEvents(formattedEvents);
+
+        let tasks = tasksResponse.data || [];
+        if (user.role.name === 'Admin') {
+          setAllTasks(tasks);
+        } else if (user.role.name === 'Project Manager') {
+          tasks = tasks.filter((task) =>
+            relevantProjects.some((project) => project._id === task.project?._id)
+          );
+          setAllTasks(tasks);
+        } else if (user.role.name === 'Team Leader') {
+          tasks = tasks.filter((task) => {
+            if (!Array.isArray(task.assignedTo)) return false;
+            return (
+              task.assignedTo.some((u) => u._id === user._id) ||
+              task.assignedTo.some((u) => u.teamLeader?._id === user._id)
+            );
+          });
+          setAllTasks(tasks);
+        } else if (user.role.name === 'Team Member') {
+          tasks = tasks.filter((task) => {
+            if (!Array.isArray(task.assignedTo)) return false;
+            return task.assignedTo.some((u) => u._id === user._id);
+          });
+          setAllTasks(tasks);
+        } else {
+          setAllTasks([]);
+        }
+
+        if (user.role.name === 'Admin') {
+          setAllUsers(usersResponse.data || []);
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        toast.error('Error loading data. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [navigate]);
+
+  const handleImageError = (e) => {
+    e.target.src = Avatar4;
+  };
+
+  const handleEventClick = (clickInfo) => {
+    setSelectedProject(clickInfo.event.extendedProps.projectDetails);
+    setShowModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setSelectedProject(null);
+  };
+
+  const handleTaskClick = (task) => {
+    const assignedToNames = Array.isArray(task.assignedTo) && task.assignedTo.length > 0
+      ? task.assignedTo.map(user => `${user.firstname || 'N/A'} ${user.lastname || 'N/A'}`).join(', ')
+      : 'Not Assigned';
+
+    const startDate = task.startDate
+      ? new Date(task.startDate).toLocaleDateString('en-US')
+      : 'Not Set';
+    const dueDate = task.dueDate
+      ? new Date(task.dueDate).toLocaleDateString('en-US')
+      : 'Not Set';
+
+    setSelectedTask({
+      ...task,
+      assignedToNames,
+      formattedStartDate: startDate,
+      formattedDueDate: dueDate,
+    });
+    setTaskForm({
+      title: task.title || '',
+      description: task.description || '',
+      startDate: task.startDate ? new Date(task.startDate).toISOString().split('T')[0] : '',
+      dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '',
+      status: task.status || '',
+      priority: task.priority || '',
+    });
+    setShowTaskModal(true);
+  };
+
+  const handleCloseTaskModal = () => {
+    setShowTaskModal(false);
+    setSelectedTask(null);
+    setTaskForm({ title: '', description: '', startDate: '', dueDate: '', status: '', priority: '' });
+  };
+
+  const handleUpdateTask = async () => {
+    if (!selectedTask) return;
+    const token = localStorage.getItem('token');
+    try {
+      const response = await axios.put(
+        `http://localhost:4000/api/tasks/${selectedTask._id}`,
+        taskForm,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const updatedTask = response.data;
+      setAllTasks((prevTasks) =>
+        prevTasks.map((task) => (task._id === updatedTask._id ? updatedTask : task))
+      );
+      toast.success('Task updated successfully!');
+      handleCloseTaskModal();
+    } catch (error) {
+      console.error('Error updating task:', error);
+      toast.error('Failed to update task.');
+    }
+  };
+
+  const handleDeleteTask = async () => {
+    if (!selectedTask) return;
+    const token = localStorage.getItem('token');
+    try {
+      await axios.delete(`http://localhost:4000/api/tasks/${selectedTask._id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setAllTasks((prevTasks) => prevTasks.filter((task) => task._id !== selectedTask._id));
+      toast.success('Task deleted successfully!');
+      handleCloseTaskModal();
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      toast.error('Failed to delete task.');
+    }
+  };
+
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setTaskForm((prev) => ({ ...prev, [name]: value }));
+  };
 
   const generateReport = () => {
     navigate('/report');
+  };
+
+  const getTaskProgress = (task) => {
+    switch (task.status?.toLowerCase()) {
+      case 'done':
+        return 100;
+      case 'tested':
+        return 90;
+      case 'review':
+        return 70;
+      case 'in progress':
+        return 50;
+      case 'to do':
+        return 0;
+      default:
+        return 0;
+    }
+  };
+
+  const getTaskColorClass = (priority) => {
+    switch (priority?.toLowerCase()) {
+      case 'urgent':
+        return { bg: 'bg-danger-300', text: 'text-danger-dark', progress: 'bg-danger-dark' };
+      case 'high':
+        return { bg: 'bg-warning-300', text: 'text-warning-dark', progress: 'bg-warning-dark' };
+      case 'medium':
+        return { bg: 'bg-info-300', text: 'text-info-dark', progress: 'bg-info-dark' };
+      case 'low':
+        return { bg: 'bg-success-300', text: 'text-success-dark', progress: 'bg-success-dark' };
+      default:
+        return { bg: 'bg-secondary-300', text: 'text-secondary-dark', progress: 'bg-secondary-dark' };
+    }
+  };
+
+  const displayedProjects = useMemo(() => {
+    let filtered = allProjects;
+    if (role === 'Project Manager') {
+      filtered = allProjects.filter((project) => project.projectManager?._id === userData?._id);
+    } else if (role === 'Team Leader' || role === 'Team Member') {
+      filtered = allProjects.filter(
+        (project) =>
+          project.projectManager?._id === userData?._id ||
+          project.teamMembers?.some((member) => member._id === userData?._id)
+      );
+    } else if (role === 'Guest') {
+      filtered = [];
+    }
+    if (statusFilter !== 'All') {
+      filtered = filtered.filter((project) => project.status === statusFilter);
+    }
+    return filtered;
+  }, [allProjects, userData, role, statusFilter]);
+
+  const displayedTasks = useMemo(() => {
+    if (role === 'Admin') return allTasks;
+    if (role === 'Project Manager') {
+      return allTasks.filter((task) =>
+        displayedProjects.some((project) => project._id === task.project?._id)
+      );
+    }
+    if (role === 'Team Leader') {
+      return allTasks.filter((task) => {
+        if (!Array.isArray(task.assignedTo)) return false;
+        return (
+          task.assignedTo.some((u) => u._id === userData?._id) ||
+          task.assignedTo.some((u) => u.teamLeader?._id === userData?._id)
+        );
+      });
+    }
+    if (role === 'Team Member') {
+      return allTasks.filter((task) => {
+        if (!Array.isArray(task.assignedTo)) return false;
+        return task.assignedTo.some((u) => u._id === userData?._id);
+      });
+    }
+    return [];
+  }, [allTasks, userData, role, displayedProjects]);
+
+  const getProjectStats = useMemo(() => {
+    return {
+      total: displayedProjects.length,
+      completed: displayedProjects.filter((p) => p.status === 'Completed').length,
+      inProgress: displayedProjects.filter((p) => p.status === 'In Progress').length,
+      pending: displayedProjects.filter((p) => p.status === 'Pending').length,
+    };
+  }, [displayedProjects]);
+
+  const getTotalHours = useMemo(() => {
+    const tasks = displayedTasks;
+    const totalEffort = tasks.reduce((sum, task) => sum + (task.effort || 1), 0);
+    const productive = tasks
+      .filter((t) => ['done', 'tested'].includes(t.status?.toLowerCase()))
+      .reduce((sum, t) => sum + (t.effort || 1), 0);
+    const middle = tasks
+      .filter((t) => ['review', 'in progress'].includes(t.status?.toLowerCase()))
+      .reduce((sum, t) => sum + (t.effort || 1), 0);
+    const idle = tasks
+      .filter((t) => t.status?.toLowerCase() === 'to do')
+      .reduce((sum, t) => sum + (t.effort || 1), 0);
+    const total = productive + middle + idle || 1;
+    return {
+      total: totalEffort,
+      productive: Number(((productive / total) * 100).toFixed(1)),
+      middle: Number(((middle / total) * 100).toFixed(1)),
+      idle: Number(((idle / total) * 100).toFixed(1)),
+    };
+  }, [displayedTasks]);
+
+  const getTimelineData = useMemo(() => {
+    let series = [];
+    let colors = ['#6f42c1', '#343a40', '#007bff', '#28a745', '#dc3545'];
+    let minDate = new Date('9999-12-31');
+    let maxDate = new Date('1970-01-01');
+
+    const updateDateRange = (startDate, endDate) => {
+      if (startDate < minDate) minDate = startDate;
+      if (endDate > maxDate) maxDate = endDate;
+    };
+
+    if (role === 'Admin') {
+      series = allUsers
+        .filter((user) => user.firstname && user.lastname)
+        .map((user) => {
+          const userTasks = allTasks.filter((task) => {
+            if (!Array.isArray(task.assignedTo)) return false;
+            return task.assignedTo.some((u) => u._id === user._id);
+          });
+          return {
+            name: `${user.firstname} ${user.lastname}`,
+            data: userTasks.map((task) => {
+              const startDate = new Date(task.startDate || task.createdAt || new Date());
+              const endDate = task.dueDate
+                ? new Date(task.dueDate)
+                : ['Done', 'Tested'].includes(task.status)
+                ? new Date(task.updatedAt || new Date())
+                : new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+              if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+                console.error('Invalid dates for task:', task);
+                return {
+                  x: DOMPurify.sanitize(task.title),
+                  y: [new Date().getTime(), new Date().getTime() + 7 * 24 * 60 * 60 * 1000],
+                };
+              }
+              updateDateRange(startDate, endDate);
+              return {
+                x: DOMPurify.sanitize(task.title),
+                y: [startDate.getTime(), endDate.getTime()],
+              };
+            }),
+          };
+        })
+        .filter((serie) => serie.data.length > 0);
+    } else if (role === 'Team Leader') {
+      const teamMembers = allUsers.filter((user) => user.teamLeader?._id === userData?._id);
+      series = [
+        {
+          name: `${userData.firstname} ${userData.lastname}`,
+          data: displayedTasks
+            .filter((task) => {
+              if (!Array.isArray(task.assignedTo)) return false;
+              return task.assignedTo.some((u) => u._id === userData?._id);
+            })
+            .map((task) => {
+              const startDate = new Date(task.startDate || task.createdAt || new Date());
+              const endDate = task.dueDate
+                ? new Date(task.dueDate)
+                : ['Done', 'Tested'].includes(task.status)
+                ? new Date(task.updatedAt || new Date())
+                : new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+              updateDateRange(startDate, endDate);
+              return {
+                x: DOMPurify.sanitize(task.title),
+                y: [startDate.getTime(), endDate.getTime()],
+              };
+            }),
+        },
+        ...teamMembers.map((member) => ({
+          name: `${member.firstname} ${member.lastname}`,
+          data: displayedTasks
+            .filter((task) => {
+              if (!Array.isArray(task.assignedTo)) return false;
+              return task.assignedTo.some((u) => u._id === member._id);
+            })
+            .map((task) => {
+              const startDate = new Date(task.startDate || task.createdAt || new Date());
+              const endDate = task.dueDate
+                ? new Date(task.dueDate)
+                : ['Done', 'Tested'].includes(task.status)
+                ? new Date(task.updatedAt || new Date())
+                : new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+              updateDateRange(startDate, endDate);
+              return {
+                x: DOMPurify.sanitize(task.title),
+                y: [startDate.getTime(), endDate.getTime()],
+              };
+            }),
+        })),
+      ].filter((serie) => serie.data.length > 0);
+    } else if (role === 'Team Member' || role === 'Project Manager') {
+      series = [
+        {
+          name: `${userData?.firstname} ${userData?.lastname || 'User'}`,
+          data: displayedTasks.map((task) => {
+            const startDate = new Date(task.startDate || task.createdAt || new Date());
+            const endDate = task.dueDate
+              ? new Date(task.dueDate)
+              : ['Done', 'Tested'].includes(task.status)
+              ? new Date(task.updatedAt || new Date())
+              : new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+            if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+              console.error('Invalid dates for task:', task);
+              return {
+                x: DOMPurify.sanitize(task.title),
+                y: [new Date().getTime(), new Date().getTime() + 7 * 24 * 60 * 60 * 1000],
+              };
+            }
+            updateDateRange(startDate, endDate);
+            return {
+              x: DOMPurify.sanitize(task.title),
+              y: [startDate.getTime(), endDate.getTime()],
+            };
+          }),
+        },
+      ].filter((serie) => serie.data.length > 0);
+    }
+
+    if (minDate > maxDate) {
+      minDate = new Date();
+      maxDate = new Date(minDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+    }
+
+    const initialMin = minDate.getTime();
+    const initialMax = maxDate.getTime();
+
+    return {
+      series,
+      colors: role === 'Admin' || role === 'Team Leader' ? colors : [colors[0]],
+      minDate: initialMin,
+      maxDate: initialMax,
+      overallMin: minDate.getTime(),
+      overallMax: maxDate.getTime(),
+    };
+  }, [allTasks, allUsers, userData, role, displayedTasks]);
+
+  useEffect(() => {
+    if (
+      getTimelineData &&
+      getTimelineData.minDate &&
+      getTimelineData.maxDate &&
+      !dateRange.min &&
+      !dateRange.max
+    ) {
+      setDateRange({
+        min: getTimelineData.minDate,
+        max: getTimelineData.maxDate,
+      });
+    }
+  }, [getTimelineData]);
+
+  const indexOfLastProject = currentPage * projectsPerPage;
+  const indexOfFirstProject = indexOfLastProject - projectsPerPage;
+  const currentProjects = displayedProjects.slice(indexOfFirstProject, indexOfLastProject);
+  const totalPages = Math.ceil(displayedProjects.length / projectsPerPage);
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+  };
+
+  const handlePrev = () => {
+    if (!dateRange.min || !dateRange.max) return;
+    const newMin = new Date(dateRange.min).getTime() - 30 * 24 * 60 * 60 * 1000;
+    const newMax = new Date(dateRange.max).getTime() - 30 * 24 * 60 * 60 * 1000;
+    setDateRange({
+      min: Math.max(newMin, getTimelineData.overallMin),
+      max: Math.max(newMax, getTimelineData.overallMin + 30 * 24 * 60 * 60 * 1000),
+    });
+  };
+
+  const handleNext = () => {
+    if (!dateRange.min || !dateRange.max) return;
+    const newMin = new Date(dateRange.min).getTime() + 30 * 24 * 60 * 60 * 1000;
+    const newMax = new Date(dateRange.max).getTime() + 30 * 24 * 60 * 60 * 1000;
+    setDateRange({
+      min: Math.min(newMin, getTimelineData.overallMax - 30 * 24 * 60 * 60 * 1000),
+      max: Math.min(newMax, getTimelineData.overallMax),
+    });
+  };
+
+  const isProjectDelayed = (project) => {
+    if (project.endDate && new Date(project.endDate) < new Date()) {
+      return 'Overdue';
+    }
+    if (
+      project.status !== 'Completed' &&
+      project.endDate &&
+      new Date(project.endDate) < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    ) {
+      return 'At Risk';
+    }
+    return 'On Time';
   };
 
   if (loading) {
@@ -50,622 +551,515 @@ const Dashboardd = () => {
         <main>
           <div className="container-fluid mt-4">
             <div className="row mb-4">
-              {/* Project Status Table */}
-              <div className="col-lg-8 col-xl-7 order-1-md mb-4 mb-lg-0">
-                <div className="p-3">
+              <div className="col-lg-9 col-xl-9 order-1-md mb-4 mb-lg-0">
+                <div className="p-3 d-flex justify-content-between align-items-center">
                   <h5 className="section-title">Project Status</h5>
+                  <select
+                    className="form-select w-auto"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    aria-label="Filter by status"
+                  >
+                    <option value="All">All</option>
+                    <option value="Pending">Pending</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Completed">Completed</option>
+                  </select>
                 </div>
                 <div className="card shadow-sm mb-0">
                   <div className="card-body py-3 px-0 overflow-hidden">
                     <div className="table-responsive app-scroll">
-                      <table className="table align-middle project-status-table mb-0">
+                      <table className="table align-middle project-status-table mb-0" role="grid">
                         <thead>
                           <tr>
                             <th scope="col">Project</th>
                             <th scope="col">Status</th>
-                            <th scope="col">TeamLead</th>
-                            <th scope="col">Priority</th>
-                            <th scope="col">Remarks</th>
+                            <th scope="col">Project Owner</th>
+                            <th scope="col">Start Date</th>
+                            <th scope="col">End Date</th>
+                            <th scope="col">Description</th>
+                            <th scope="col">Delay Risk</th>
                           </tr>
                         </thead>
                         <tbody>
-                          <tr>
-                            <td><h6 className="mb-0 text-success-dark text-nowrap">Web Redesign</h6></td>
-                            <td><span className="badge text-light-warning bg-light-warning f-s-9 f-w-700">In Progress</span></td>
-                            <td className="f-w-600 text-dark">
-                              <a className="h-30 w-30 d-flex-center b-r-50 overflow-hidden text-bg-secondary m-auto" title="Athena Stewart">
-                                <img alt="avatar" className="img-fluid" src={Avatar2} />
-                              </a>
-                            </td>
-                            <td className="text-success-dark f-w-600">High</td>
-                            <td><span className="text-dark f-s-14 f-w-500 text-nowrap"><CircleDashed className="me-2 f-s-6" /> Design phase completed</span></td>
-                          </tr>
-                          <tr>
-                            <td><h6 className="mb-0 text-warning-dark text-nowrap">Mobile App</h6></td>
-                            <td><span className="badge text-light-success bg-light-success f-s-9 f-w-700">Completed</span></td>
-                            <td className="f-w-600 text-dark">
-                              <a className="h-30 w-30 d-flex-center b-r-50 overflow-hidden text-bg-secondary m-auto" title="Jane Smith">
-                                <img alt="avatar" className="img-fluid" src={Avatar3} />
-                              </a>
-                            </td>
-                            <td className="text-secondary-dark f-w-600">Medium</td>
-                            <td><span className="text-dark f-s-14 f-w-500 text-nowrap"><CircleDashed className="me-2 f-s-6" /> Project deployed successfully</span></td>
-                          </tr>
-                          <tr>
-                            <td><h6 className="mb-0 text-danger-dark text-nowrap">Campaign</h6></td>
-                            <td><span className="badge text-light-secondary bg-light-secondary f-s-9 f-w-700">Not Started</span></td>
-                            <td className="f-w-600 text-dark">
-                              <a className="h-30 w-30 d-flex-center b-r-50 overflow-hidden text-bg-secondary m-auto" title="Mark Lee">
-                                <img alt="avatar" className="img-fluid" src={Avatar4} />
-                              </a>
-                            </td>
-                            <td className="text-danger-dark f-w-600">Low</td>
-                            <td><span className="text-dark f-s-14 f-w-500 text-nowrap"><CircleDashed className="me-2 f-s-6" /> Campaign to begin in December</span></td>
-                          </tr>
-                          <tr>
-                            <td><h6 className="mb-0 text-primary-dark text-nowrap">E-Commerce</h6></td>
-                            <td><span className="badge text-light-warning bg-light-warning f-s-9 f-w-700">In Progress</span></td>
-                            <td className="f-w-600 text-dark">
-                              <a className="h-30 w-30 d-flex-center b-r-50 overflow-hidden text-bg-secondary m-auto" title="Alice Johnson">
-                                <img alt="avatar" className="img-fluid" src={Avatar5} />
-                              </a>
-                            </td>
-                            <td className="text-success-dark f-w-600">High</td>
-                            <td><span className="text-dark f-s-14 f-w-500 text-nowrap"><CircleDashed className="me-2 f-s-6" /> Initial setup</span></td>
-                          </tr>
-                          <tr>
-                            <td><h6 className="mb-0 text-success-dark text-nowrap">Social Media</h6></td>
-                            <td><span className="badge text-light-success bg-light-success f-s-9 f-w-700">Completed</span></td>
-                            <td className="f-w-600 text-dark">
-                              <a className="h-30 w-30 d-flex-center b-r-50 overflow-hidden text-bg-secondary m-auto" title="Bob Brown">
-                                <img alt="avatar" className="img-fluid" src={Avatar6} />
-                              </a>
-                            </td>
-                            <td className="text-danger-dark f-w-600">Low</td>
-                            <td><span className="text-dark f-s-14 f-w-500 text-nowrap"><CircleDashed className="me-2 f-s-6" /> Campaign launched successfully</span></td>
-                          </tr>
-                          <tr>
-                            <td><h6 className="mb-0 text-info-dark text-nowrap">SEO Optimization</h6></td>
-                            <td><span className="badge text-light-warning bg-light-warning f-s-9 f-w-700">In Progress</span></td>
-                            <td className="f-w-600 text-dark">
-                              <a className="h-30 w-30 d-flex-center b-r-50 overflow-hidden text-bg-secondary m-auto" title="Emma Davis">
-                                <img alt="avatar" className="img-fluid" src={Avatar7} />
-                              </a>
-                            </td>
-                            <td className="text-secondary-dark f-w-600">Medium</td>
-                            <td><span className="text-dark f-s-14 f-w-500 text-nowrap"><CircleDashed className="me-2 f-s-6" /> Keyword analysis ongoing</span></td>
-                          </tr>
-                          <tr>
-                            <td><h6 className="mb-0 text-primary-dark text-nowrap">UI/UX Revamp</h6></td>
-                            <td><span className="badge text-light-info bg-light-info f-s-9 f-w-700">Scheduled</span></td>
-                            <td className="f-w-600 text-dark">
-                              <a className="h-30 w-30 d-flex-center b-r-50 overflow-hidden text-bg-secondary m-auto" title="Liam Wilson">
-                                <img alt="avatar" className="img-fluid" src={Avatar8} />
-                              </a>
-                            </td>
-                            <td className="text-danger-dark f-w-600">Low</td>
-                            <td><span className="text-dark f-s-14 f-w-500 text-nowrap"><CircleDashed className="me-2 f-s-6" /> Resources allocated</span></td>
-                          </tr>
+                          {currentProjects.length > 0 ? (
+                            currentProjects.map((project) => (
+                              <tr key={project._id}>
+                                <td>
+                                  <h6
+                                    className="mb-0 text-success-dark text-nowrap"
+                                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(project.name) }}
+                                  />
+                                </td>
+                                <td>
+                                  <span
+                                    className={`badge badge-${
+                                      project.status ? project.status.toLowerCase().replace(" ", "-") : "unknown"
+                                    } f-s-9 f-w-700`}
+                                    style={
+                                      project.status === "In Progress"
+                                        ? { backgroundColor: "#f5f5d5", color: "#000" }
+                                        : project.status === "Completed"
+                                        ? { backgroundColor: "#d3e2e5", color: "#4a4a4a" }
+                                        : project.status === "Pending"
+                                        ? { backgroundColor: "#d3e2e5", color: "#4a4a4a" }
+                                        : { backgroundColor: "#e0e0e0", color: "#000" }
+                                    }
+                                  >
+                                    {project.status || "Unknown"}
+                                  </span>
+                                </td>
+                                <td className="f-w-600 text-dark text-nowrap">
+                                  {project.projectManager?.profileImage ? (
+                                    <img
+                                      src={project.projectManager?.profileImage}
+                                      alt="Team Leader"
+                                      className="rounded-circle"
+                                      style={{ width: '50px', height: '50px', objectFit: 'cover' }}
+                                      onError={handleImageError}
+                                    />
+                                  ) : (
+                                    <img
+                                      src={Avatar4}
+                                      alt="Team Lead"
+                                      className="rounded-circle"
+                                      style={{ width: '35px', height: '35px', objectFit: 'cover' }}
+                                    />
+                                  )}
+                                </td>
+                                <td className="text-success-dark f-w-600">
+                                  {project.startDate
+                                    ? new Date(project.startDate).toLocaleDateString('en-US', {
+                                        month: '2-digit',
+                                        day: '2-digit',
+                                        year: 'numeric',
+                                      })
+                                    : 'Not Set'}
+                                </td>
+                                <td className="text-success-dark f-w-600">
+                                  {project.endDate
+                                    ? new Date(project.endDate).toLocaleDateString('en-US', {
+                                        month: '2-digit',
+                                        day: '2-digit',
+                                        year: 'numeric',
+                                      })
+                                    : 'Not Set'}
+                                </td>
+                                <td>
+                                  <span className="text-dark f-s-14 f-w-500 text-nowrap">
+                                    <CircleDashed className="me-2 f-s-6" />
+                                    {DOMPurify.sanitize(project.description || 'No description available')}
+                                  </span>
+                                </td>
+                                <td>
+                                  <span
+                                    className={`badge ${
+                                      isProjectDelayed(project) === 'Overdue'
+                                        ? 'bg-danger'
+                                        : isProjectDelayed(project) === 'At Risk'
+                                        ? 'bg-warning'
+                                        : 'bg-success'
+                                    }`}
+                                  >
+                                    {isProjectDelayed(project)}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan="8" className="text-center">
+                                No projects available
+                              </td>
+                            </tr>
+                          )}
                         </tbody>
                       </table>
                     </div>
                   </div>
                 </div>
                 <div className="table-footer d-flex justify-content-between align-items-center mt-3">
-                  <p className="mb-0 f-s-15 f-w-500 txt-ellipsis-1">Showing 7 to 20 of 20 entries</p>
+                  <p className="mb-0 f-s-15 f-w-500 txt-ellipsis-1">
+                    Showing {currentProjects.length} of {displayedProjects.length} entries
+                  </p>
                   <ul className="pagination app-pagination justify-content-end">
-                    <li className="page-item"><a className="page-link b-r-left" href="#">Previous</a></li>
-                    <li className="page-item"><a className="page-link" href="#">1</a></li>
-                    <li className="page-item active"><a className="page-link" href="#">2</a></li>
-                    <li className="page-item"><a className="page-link" href="#">3</a></li>
-                    <li className="page-item"><a className="page-link b-r-right" href="#">Next</a></li>
+                    <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                      <a
+                        className="page-link b-r-left"
+                        href="#"
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        aria-label="Previous"
+                      >
+                        Previous
+                      </a>
+                    </li>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <li key={page} className={`page-item ${currentPage === page ? 'active' : ''}`}>
+                        <a className="page-link" href="#" onClick={() => handlePageChange(page)}>
+                          {page}
+                        </a>
+                      </li>
+                    ))}
+                    <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+                      <a
+                        className="page-link b-r-right"
+                        href="#"
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        aria-label="Next"
+                      >
+                        Next
+                      </a>
+                    </li>
                   </ul>
                 </div>
-                      {/* RAPPORT */}
-                      <div className='text-center'>
-                  <button className='btn btn-primary' onClick={generateReport}>Generate a report</button>
-                </div>
+                {role === 'Admin' && (
+                  <div className="text-center mt-3">
+                    <button className="btn btn-primary" onClick={generateReport} aria-label="Generate Report">
+                      Generate Report
+                    </button>
+                  </div>
+                )}
               </div>
 
-              {/* Today Tasks (Vertical List) */}
-              <div className="col-lg-4 col-xl-5">
+              <div className="col-lg-3 col-xl-3">
                 <div className="p-3">
-                  <h5 className="section-title">Today Tasks</h5>
+                  <h5 className="section-title">{role === 'Admin' ? 'All Tasks' : 'My Tasks'}</h5>
                 </div>
                 <div className="card shadow-sm">
-                  <div className="card-body task-list-container">
+                  <div className="card-body task-list-container" style={{ maxHeight: '400px', overflowY: 'auto' }}>
                     <div className="task-list">
-                      <div className="card task-card bg-danger-300 mb-3">
-                        <div className="card-body">
-                          <h6 className="text-danger-dark txt-ellipsis-1">Finalize Project Proposal</h6>
-                          <ul className="avatar-group justify-content-start my-3">
-                            <li className="h-35 w-35 d-flex-center b-r-50 overflow-hidden bg-primary">
-                              <img alt="avatar" className="img-fluid" src={Avatar4} />
-                            </li>
-                            <li className="h-35 w-35 d-flex-center b-r-50 overflow-hidden bg-success" title="Lennon Briggs">
-                              <img alt="avatar" className="img-fluid" src={Avatar5} />
-                            </li>
-                            <li className="h-35 w-35 d-flex-center b-r-50 overflow-hidden bg-danger" title="Maya Horton">
-                              <img alt="avatar" className="img-fluid" src={Avatar6} />
-                            </li>
-                          </ul>
-                          <div className="d-flex justify-content-between align-items-center">
-                            <div className="progress w-100" role="progressbar" aria-valuenow="68" aria-valuemin="0" aria-valuemax="100">
-                              <div className="progress-bar bg-danger-dark progress-bar-striped progress-bar-animated" style={{ width: '68%' }}></div>
+                      {displayedTasks.length > 0 ? (
+                        displayedTasks.map((task) => {
+                          const progress = getTaskProgress(task);
+                          const { bg, text, progress: progressColor } = getTaskColorClass(task.priority);
+
+                          return (
+                            <div
+                              key={task._id}
+                              className={`card task-card ${bg} mb-3`}
+                              onClick={() => handleTaskClick(task)}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              <div className="card-body">
+                                <h6
+                                  className={`${text} txt-ellipsis-1`}
+                                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(task.title) }}
+                                />
+
+                                <div className="d-flex justify-content-between align-items-center">
+                                  <div
+                                    className="progress w-100"
+                                    role="progressbar"
+                                    aria-valuenow={progress}
+                                    aria-valuemin="0"
+                                    aria-valuemax="100"
+                                  >
+                                    <div
+                                      className={`progress-bar ${progressColor} progress-bar-striped progress-bar-animated`}
+                                      style={{ width: `${progress}%` }}
+                                    ></div>
+                                  </div>
+                                  <span className="badge bg-white-400 text-secondary-dark ms-2">+ {progress}%</span>
+                                </div>
+                              </div>
                             </div>
-                            <span className="badge bg-white-400 text-secondary-dark ms-2">+ 68%</span>
-                          </div>
+                          );
+                        })
+                      ) : (
+                        <div className="text-center">
+                          <p>No tasks available</p>
                         </div>
-                      </div>
-                      <div className="card task-card bg-warning-300 mb-3">
-                        <div className="card-body">
-                          <h6 className="text-warning-dark txt-ellipsis-1">Design Homepage Layout</h6>
-                          <ul className="avatar-group justify-content-start my-3">
-                            <li className="h-35 w-35 d-flex-center b-r-50 overflow-hidden bg-primary">
-                              <img alt="avatar" className="img-fluid" src={Avatar4} />
-                            </li>
-                            <li className="h-35 w-35 d-flex-center b-r-50 overflow-hidden bg-info" title="Sophia Turner">
-                              <img alt="avatar" className="img-fluid" src={Avatar5} />
-                            </li>
-                            <li className="h-35 w-35 d-flex-center b-r-50 overflow-hidden bg-warning" title="Lucas Green">
-                              <img alt="avatar" className="img-fluid" src={Avatar6} />
-                            </li>
-                          </ul>
-                          <div className="d-flex justify-content-between align-items-center">
-                            <div className="progress w-100" role="progressbar" aria-valuenow="35" aria-valuemin="0" aria-valuemax="100">
-                              <div className="progress-bar bg-warning-dark progress-bar-striped progress-bar-animated" style={{ width: '35%' }}></div>
-                            </div>
-                            <span className="badge bg-white-400 text-secondary-dark ms-2">+ 35%</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="card task-card bg-info-300 mb-3">
-                        <div className="card-body">
-                          <h6 className="text-info-dark txt-ellipsis-1">Develop API Integration</h6>
-                          <ul className="avatar-group justify-content-start my-3">
-                            <li className="h-35 w-35 d-flex-center b-r-50 overflow-hidden bg-info">
-                              <img alt="avatar" className="img-fluid" src={Avatar4} />
-                            </li>
-                            <li className="h-35 w-35 d-flex-center b-r-50 overflow-hidden bg-info" title="Michael Johnson">
-                              <img alt="avatar" className="img-fluid" src={Avatar5} />
-                            </li>
-                            <li className="h-35 w-35 d-flex-center b-r-50 overflow-hidden bg-warning" title="Emily Brown">
-                              <img alt="avatar" className="img-fluid" src={Avatar6} />
-                            </li>
-                          </ul>
-                          <div className="d-flex justify-content-between align-items-center">
-                            <div className="progress w-100" role="progressbar" aria-valuenow="60" aria-valuemin="0" aria-valuemax="100">
-                              <div className="progress-bar bg-info-dark progress-bar-striped progress-bar-animated" style={{ width: '60%' }}></div>
-                            </div>
-                            <span className="badge bg-white-400 text-secondary-dark ms-2">+ 60%</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="card task-card bg-success-300 mb-3">
-                        <div className="card-body">
-                          <h6 className="text-success-dark txt-ellipsis-1">Test User Feedback</h6>
-                          <ul className="avatar-group justify-content-start my-3">
-                            <li className="h-35 w-35 d-flex-center b-r-50 overflow-hidden bg-primary">
-                              <img alt="avatar" className="img-fluid" src={Avatar4} />
-                            </li>
-                            <li className="h-35 w-35 d-flex-center b-r-50 overflow-hidden bg-info" title="Alice Smith">
-                              <img alt="avatar" className="img-fluid" src={Avatar5} />
-                            </li>
-                            <li className="h-35 w-35 d-flex-center b-r-50 overflow-hidden bg-success" title="John Doe">
-                              <img alt="avatar" className="img-fluid" src={Avatar6} />
-                            </li>
-                          </ul>
-                          <div className="d-flex justify-content-between align-items-center">
-                            <div className="progress w-100" role="progressbar" aria-valuenow="80" aria-valuemin="0" aria-valuemax="100">
-                              <div className="progress-bar bg-success-dark progress-bar-striped progress-bar-animated" style={{ width: '80%' }}></div>
-                            </div>
-                            <span className="badge bg-white-400 text-secondary-dark ms-2">+ 80%</span>
-                          </div>
-                        </div>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Multi-series Timeline and Simple Pie Chart */}
             <div className="row mb-4">
-              {/* Multi-series Timeline */}
               <div className="col-lg-8">
                 <div className="card shadow-sm">
                   <div className="card-header">
-                    <h5 className="section-title">Multi-series Timeline</h5>
+                    <h5 className="section-title">Member Productivity by Tasks</h5>
                   </div>
                   <div className="card-body">
-                    <Chart
-                      options={{
-                        chart: {
-                          type: 'rangeBar',
-                          toolbar: { show: false },
-                        },
-                        plotOptions: {
-                          bar: {
-                            horizontal: true,
-                            barHeight: '50%',
-                            rangeBarGroupRows: true,
-                          },
-                        },
-                        xaxis: {
-                          type: 'datetime',
-                          min: new Date('2024-02-27').getTime(),
-                          max: new Date('2024-03-20').getTime(),
-                          labels: {
-                            format: 'dd MMM',
-                          },
-                        },
-                        yaxis: {
-                          labels: {
-                            style: {
-                              fontSize: '14px',
-                              fontWeight: 600,
+                    {getTimelineData.series.length > 0 ? (
+                      <>
+                        <div className="d-flex justify-content-between align-items-center mb-2">
+                          <button
+                            onClick={handlePrev}
+                            disabled={dateRange.min === null || dateRange.min <= getTimelineData.overallMin}
+                            className="btn btn-light"
+                            aria-label="Previous period"
+                          >
+                            <ChevronLeft size={20} /> Previous
+                          </button>
+                          <span>
+                            {dateRange.min && dateRange.max
+                              ? `${new Date(dateRange.min).toLocaleDateString('en-US')} - ${new Date(
+                                  dateRange.max
+                                ).toLocaleDateString('en-US')}`
+                              : 'Select a date range'}
+                          </span>
+                          <button
+                            onClick={handleNext}
+                            disabled={dateRange.max === null || dateRange.max >= getTimelineData.overallMax}
+                            className="btn btn-light"
+                            aria-label="Next period"
+                          >
+                            Next <ChevronRight size={20} />
+                          </button>
+                        </div>
+                        <Chart
+                          options={{
+                            chart: {
+                              type: 'rangeBar',
+                              toolbar: { show: false },
+                              zoom: { enabled: false },
                             },
-                          },
-                        },
-                        fill: {
-                          type: 'solid',
-                          opacity: [0.6, 1],
-                        },
-                        colors: ['#6f42c1', '#343a40'],
-                        legend: {
-                          position: 'top',
-                          horizontalAlign: 'right',
-                          markers: {
-                            width: 12,
-                            height: 12,
-                            radius: 12,
-                          },
-                        },
-                        dataLabels: {
-                          enabled: true,
-                          formatter: (val) => {
-                            const diff = (val[1] - val[0]) / (1000 * 60 * 60 * 24);
-                            return `${diff} days`;
-                          },
-                          style: {
-                            colors: ['#fff'],
-                            fontSize: '12px',
-                          },
-                        },
-                        tooltip: {
-                          enabled: false,
-                        },
-                      }}
-                      series={[
-                        {
-                          name: 'Bob',
-                          data: [
-                            { x: 'Design', y: [new Date('2024-03-03').getTime(), new Date('2024-03-06').getTime()] },
-                            { x: 'Code', y: [new Date('2024-03-07').getTime(), new Date('2024-03-10').getTime()] },
-                            { x: 'Test', y: [new Date('2024-03-11').getTime(), new Date('2024-03-16').getTime()] },
-                          ],
-                        },
-                        {
-                          name: 'Joe',
-                          data: [
-                            { x: 'Design', y: [new Date('2024-03-01').getTime(), new Date('2024-03-04').getTime()] },
-                            { x: 'Code', y: [new Date('2024-03-05').getTime(), new Date('2024-03-08').getTime()] },
-                            { x: 'Test', y: [new Date('2024-03-09').getTime(), new Date('2024-03-18').getTime()] },
-                          ],
-                        },
-                      ]}
-                      type="rangeBar"
-                      height={200}
-                    />
+                            plotOptions: {
+                              bar: {
+                                horizontal: true,
+                                barHeight: '50%',
+                                rangeBarGroupRows: true,
+                              },
+                            },
+                            xaxis: {
+                              type: 'datetime',
+                              min: dateRange.min,
+                              max: dateRange.max,
+                              labels: {
+                                format: 'MM/dd/yyyy',
+                                datetimeUTC: false,
+                                style: { fontSize: '12px' },
+                              },
+                              tickAmount: 6,
+                            },
+                            yaxis: {
+                              labels: {
+                                style: { fontSize: '14px', fontWeight: 600 },
+                                maxWidth: 200,
+                                formatter: (value) => (value.length > 20 ? value.substring(0, 17) + '...' : value),
+                              },
+                            },
+                            fill: { type: 'solid', opacity: 0.8 },
+                            colors: getTimelineData.colors,
+                            legend: {
+                              position: 'top',
+                              horizontalAlign: 'right',
+                              markers: { width: 12, height: 12, radius: 12 },
+                            },
+                            dataLabels: { enabled: false },
+                            tooltip: {
+                              enabled: true,
+                              custom: ({ series, seriesIndex, dataPointIndex, w }) => {
+                                const data = w.config.series[seriesIndex].data[dataPointIndex];
+                                const start = new Date(data.y[0]).toLocaleDateString('en-US');
+                                const end = new Date(data.y[1]).toLocaleDateString('en-US');
+                                return `<div class="apexcharts-tooltip-rangebar">
+                                  <div><strong>${w.config.series[seriesIndex].name}</strong></div>
+                                  <div>Task: ${DOMPurify.sanitize(data.x)}</div>
+                                  <div>Start: ${start}</div>
+                                  <div>End: ${end}</div>
+                                </div>`;
+                              },
+                            },
+                          }}
+                          series={getTimelineData.series}
+                          type="rangeBar"
+                          height={300}
+                        />
+                      </>
+                    ) : (
+                      <div className="text-center">
+                        <p>No tasks available for this period</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
-
-              {/* Simple Pie Chart */}
               <div className="col-lg-4">
-                <div className="card shadow-sm equal-card">
+                <div className="card shadow-sm">
                   <div className="card-header">
-                    <h5 className="section-title">Simple Pie Chart</h5>
+                    <h5 className="section-title">Task Status Distribution</h5>
                   </div>
                   <div className="card-body">
                     <Chart
                       options={{
-                        chart: {
-                          type: 'pie',
-                        },
-                        labels: ['Team A', 'Team B', 'Team C', 'Team D', 'Team E'],
-                        colors: ['#6f42c1', '#343a40', '#28a745', '#dc3545', '#ffc107'],
-                        legend: {
-                          position: 'bottom',
-                          fontSize: '14px',
-                          fontWeight: 600,
-                          markers: {
-                            width: 12,
-                            height: 12,
-                            radius: 12,
-                          },
-                        },
+                        chart: { type: 'donut' },
+                        labels: ['Done', 'Tested', 'Review', 'In Progress', 'To Do'],
+                        colors: ['#28a745', '#17a2b8', '#ffc107', '#007bff', '#dc3545'],
+                        legend: { position: 'bottom', fontSize: '14px' },
                         dataLabels: {
                           enabled: true,
-                          formatter: (val) => `${val.toFixed(1)}%`,
+                          formatter: (val, opts) => {
+                            const total = opts.w.globals.seriesTotals.reduce((a, b) => a + b, 0);
+                            return `${((val / total) * 100).toFixed(1)}%`;
+                          },
                         },
                         responsive: [
                           {
                             breakpoint: 480,
                             options: {
-                              chart: {
-                                width: 200,
-                              },
-                              legend: {
-                                position: 'bottom',
-                              },
+                              chart: { width: 200 },
+                              legend: { position: 'bottom' },
                             },
                           },
                         ],
                       }}
-                      series={[24.9, 31.1, 7.3, 24.3, 12.4]}
-                      type="pie"
-                      height={200}
+                      series={[ 
+                        displayedTasks.filter((t) => t.status === 'Done').length,
+                        displayedTasks.filter((t) => t.status === 'Tested').length,
+                        displayedTasks.filter((t) => t.status === 'Review').length,
+                        displayedTasks.filter((t) => t.status === 'In Progress').length,
+                        displayedTasks.filter((t) => t.status === 'To Do').length,
+                      ]}
+                      type="donut"
+                      height={250}
                     />
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Ticket Cards, Total Hours, and Orders Details */}
             <div className="row mb-4">
-              {/* Ticket Cards and Total Hours */}
-              <div className="col-lg-8">
+              <div className="col-lg-12">
                 <div className="row">
-                  {/* Left Column: All Tickets and Completed Tickets */}
-                  <div className="col-sm-6">
-                    {/* All Tickets */}
+                  <div className="col-sm-3">
                     <div className="card ticket-card shadow-sm bg-light-primary mb-4">
                       <div className="card-body">
                         <Circle className="circle-bg-img" />
                         <div className="h-40 w-60 d-flex-center b-r-10 bg-white mb-2 mx-auto">
-                          <Ticket className="f-s-20 text-primary" />
+                          <Circle className="f-s-20 text-primary" />
                         </div>
-                        <p className="f-s-14 text-center text-uppercase text-dark">All Tickets</p>
+                        <p className="f-s-14 text-center text-uppercase text-dark">All Projects</p>
                         <div className="d-flex justify-content-between align-items-center">
-                          <h3 className="text-primary-dark f-s-28 f-w-700">185</h3>
+                          <h3 className="text-primary-dark f-s-28 f-w-700">{getProjectStats.total}</h3>
                           <ul className="avatar-group">
-                            <li className="h-30 w-30 d-flex-center b-r-50 text-bg-danger b-2-light position-relative" title="Sabrina Torres">
-                              <span className="position-absolute top-0 end-0 h-10 w-10 bg-danger border border-light rounded-circle"></span>
-                              <img alt="" className="img-fluid b-r-50 overflow-hidden" src={Avatar4} />
+                            <li className="h-30 w-30 d-flex-center b-r-50 text-bg-primary b-2-light position-relative">
+                              <span className="position-absolute top-0 end-0 h-10 w-10 bg-primary border border-light rounded-circle"></span>
+                              <img alt="avatar" className="img-fluid b-r-50 overflow-hidden" src={Avatar4} />
                             </li>
-                            <li className="h-30 w-30 d-flex-center b-r-50 text-bg-success b-2-light position-relative" title="John Doe">
-                              <span className="position-absolute top-0 end-0 h-10 w-10 bg-success border border-light rounded-circle"></span>
-                              <img alt="" className="img-fluid b-r-50 overflow-hidden" src={Avatar5} />
-                            </li>
-                            <li className="h-30 w-30 d-flex-center b-r-50 text-bg-danger b-2-light position-relative" title="User">
-                              <span className="position-absolute top-0 end-0 h-10 w-10 bg-danger border border-light rounded-circle"></span>
-                              <img alt="" className="img-fluid b-r-50 overflow-hidden" src={Avatar6} />
-                            </li>
-                            <li className="h-30 w-30 d-flex-center b-r-50 text-bg-success b-2-light position-relative" title="User">
-                              <span className="position-absolute top-0 end-0 h-10 w-10 bg-success border border-light rounded-circle"></span>
-                              <img alt="" className="img-fluid b-r-50 overflow-hidden" src={Avatar7} />
-                            </li>
-                            <li className="h-30 w-30 d-flex-center b-r-50 text-bg-danger b-2-light position-relative" title="User">
-                              <span className="position-absolute top-0 end-0 h-10 w-10 bg-danger border border-light rounded-circle"></span>
-                              <img alt="" className="img-fluid b-r-50 overflow-hidden" src={Avatar8} />
-                            </li>
-                            <li className="bg-white text-dark h-25 w-25 d-flex-center b-r-50 f-s-12">5+</li>
                           </ul>
                         </div>
                       </div>
                     </div>
-
-                    {/* Completed Tickets */}
+                  </div>
+                  <div className="col-sm-3">
                     <div className="card ticket-card shadow-sm bg-light-success mb-4">
                       <div className="card-body">
                         <Circle className="circle-bg-img" />
                         <div className="h-40 w-60 d-flex-center b-r-10 bg-white mb-2 mx-auto">
-                          <Cloud className="f-s-20 text-success" />
+                          <CheckCircle className="f-s-20 text-success" />
                         </div>
-                        <p className="f-s-14 text-center text-uppercase text-dark">Completed Tickets</p>
+                        <p className="f-s-14 text-center text-uppercase text-dark">Completed Projects</p>
                         <div className="d-flex justify-content-between align-items-center">
-                          <h3 className="text-success-dark f-s-28 f-w-700">185</h3>
+                          <h3 className="text-success-dark f-s-28 f-w-700">{getProjectStats.completed}</h3>
                           <ul className="avatar-group">
-                            <li className="h-30 w-30 d-flex-center b-r-50 text-bg-danger b-2-light position-relative" title="User">
-                              <span className="position-absolute top-0 end-0 h-10 w-10 bg-danger border border-light rounded-circle"></span>
-                              <img alt="" className="img-fluid b-r-50 overflow-hidden" src={Avatar6} />
-                            </li>
-                            <li className="h-30 w-30 d-flex-center b-r-50 text-bg-success b-2-light position-relative" title="User">
+                            <li className="h-30 w-30 d-flex-center b-r-50 text-bg-success b-2-light position-relative">
                               <span className="position-absolute top-0 end-0 h-10 w-10 bg-success border border-light rounded-circle"></span>
-                              <img alt="" className="img-fluid b-r-50 overflow-hidden" src={Avatar7} />
+                              <img alt="avatar" className="img-fluid b-r-50 overflow-hidden" src={Avatar4} />
                             </li>
-                            <li className="h-30 w-30 d-flex-center b-r-50 text-bg-danger b-2-light position-relative" title="User">
-                              <span className="position-absolute top-0 end-0 h-10 w-10 bg-danger border border-light rounded-circle"></span>
-                              <img alt="" className="img-fluid b-r-50 overflow-hidden" src={Avatar8} />
-                            </li>
-                            <li className="h-30 w-30 d-flex-center b-r-50 text-bg-success b-2-light position-relative" title="User">
-                              <span className="position-absolute top-0 end-0 h-10 w-10 bg-success border border-light rounded-circle"></span>
-                              <img alt="" className="img-fluid b-r-50 overflow-hidden" src={Avatar4} />
-                            </li>
-                            <li className="h-30 w-30 d-flex-center b-r-50 text-bg-danger b-2-light position-relative" title="User">
-                              <span className="position-absolute top-0 end-0 h-10 w-10 bg-danger border border-light rounded-circle"></span>
-                              <img alt="" className="img-fluid b-r-50 overflow-hidden" src={Avatar5} />
-                            </li>
-                            <li className="bg-white text-dark h-25 w-25 d-flex-center b-r-50 f-s-12">5+</li>
                           </ul>
                         </div>
                       </div>
                     </div>
                   </div>
-
-                  {/* Right Column: Pending Tickets, Cancelled Tickets, and Total Hours */}
-                  <div className="col-sm-6">
-                    {/* Pending Tickets */}
+                  <div className="col-sm-3">
                     <div className="card ticket-card shadow-sm bg-light-info mb-4">
                       <div className="card-body">
                         <Circle className="circle-bg-img" />
                         <div className="h-40 w-60 d-flex-center b-r-10 bg-white mb-2 mx-auto">
-                          <Clock className="f-s-20 text-info" />
+                          <PlayCircle className="f-s-20 text-info" />
                         </div>
-                        <p className="f-s-14 text-center text-uppercase text-dark">Pending Tickets</p>
+                        <p className="f-s-14 text-center text-uppercase text-dark">In Progress Projects</p>
                         <div className="d-flex justify-content-between align-items-center">
-                          <h3 className="text-info-dark f-s-28 f-w-700">185</h3>
+                          <h3 className="text-info-dark f-s-28 f-w-700">{getProjectStats.inProgress}</h3>
                           <ul className="avatar-group">
-                            <li className="h-30 w-30 d-flex-center b-r-50 text-bg-danger b-2-light position-relative" title="User">
-                              <span className="position-absolute top-0 end-0 h-10 w-10 bg-danger border border-light rounded-circle"></span>
-                              <img alt="" className="img-fluid b-r-50 overflow-hidden" src={Avatar5} />
+                            <li className="h-30 w-30 d-flex-center b-r-50 text-bg-info b-2-light position-relative">
+                              <span className="position-absolute top-0 end-0 h-10 w-10 bg-info border border-light rounded-circle"></span>
+                              <img alt="avatar" className="img-fluid b-r-50 overflow-hidden" src={Avatar4} />
                             </li>
-                            <li className="h-30 w-30 d-flex-center b-r-50 text-bg-success b-2-light position-relative" title="User">
-                              <span className="position-absolute top-0 end-0 h-10 w-10 bg-success border border-light rounded-circle"></span>
-                              <img alt="" className="img-fluid b-r-50 overflow-hidden" src={Avatar6} />
-                            </li>
-                            <li className="h-30 w-30 d-flex-center b-r-50 text-bg-danger b-2-light position-relative" title="User">
-                              <span className="position-absolute top-0 end-0 h-10 w-10 bg-danger border border-light rounded-circle"></span>
-                              <img alt="" className="img-fluid b-r-50 overflow-hidden" src={Avatar7} />
-                            </li>
-                            <li className="h-30 w-30 d-flex-center b-r-50 text-bg-success b-2-light position-relative" title="User">
-                              <span className="position-absolute top-0 end-0 h-10 w-10 bg-success border border-light rounded-circle"></span>
-                              <img alt="" className="img-fluid b-r-50 overflow-hidden" src={Avatar8} />
-                            </li>
-                            <li className="h-30 w-30 d-flex-center b-r-50 text-bg-danger b-2-light position-relative" title="User">
-                              <span className="position-absolute top-0 end-0 h-10 w-10 bg-danger border border-light rounded-circle"></span>
-                              <img alt="" className="img-fluid b-r-50 overflow-hidden" src={Avatar4} />
-                            </li>
-                            <li className="bg-white text-dark h-25 w-25 d-flex-center b-r-50 f-s-12">5+</li>
                           </ul>
                         </div>
                       </div>
                     </div>
-
-                    {/* Cancelled Tickets */}
+                  </div>
+                  <div className="col-sm-3">
                     <div className="card ticket-card shadow-sm bg-light-warning mb-4">
                       <div className="card-body">
                         <Circle className="circle-bg-img" />
                         <div className="h-40 w-60 d-flex-center b-r-10 bg-white mb-2 mx-auto">
-                          <FileX className="f-s-20 text-warning" />
+                          <PauseCircle className="f-s-20 text-warning" />
                         </div>
-                        <p className="f-s-14 text-center text-uppercase text-dark">Cancelled Tickets</p>
+                        <p className="f-s-14 text-center text-uppercase text-dark">Pending Projects</p>
                         <div className="d-flex justify-content-between align-items-center">
-                          <h3 className="text-warning-dark f-s-28 f-w-700">185</h3>
+                          <h3 className="text-warning-dark f-s-28 f-w-700">{getProjectStats.pending}</h3>
                           <ul className="avatar-group">
-                            <li className="h-30 w-30 d-flex-center b-r-50 text-bg-danger b-2-light position-relative" title="User">
-                              <span className="position-absolute top-0 end-0 h-10 w-10 bg-danger border border-light rounded-circle"></span>
-                              <img alt="" className="img-fluid b-r-50 overflow-hidden" src={Avatar7} />
+                            <li className="h-30 w-30 d-flex-center b-r-50 text-bg-warning b-2-light position-relative">
+                              <span className="position-absolute top-0 end-0 h-10 w-10 bg-warning border border-light rounded-circle"></span>
+                              <img alt="avatar" className="img-fluid b-r-50 overflow-hidden" src={Avatar4} />
                             </li>
-                            <li className="h-30 w-30 d-flex-center b-r-50 text-bg-success b-2-light position-relative" title="User">
-                              <span className="position-absolute top-0 end-0 h-10 w-10 bg-success border border-light rounded-circle"></span>
-                              <img alt="" className="img-fluid b-r-50 overflow-hidden" src={Avatar8} />
-                            </li>
-                            <li className="h-30 w-30 d-flex-center b-r-50 text-bg-danger b-2-light position-relative" title="User">
-                              <span className="position-absolute top-0 end-0 h-10 w-10 bg-danger border border-light rounded-circle"></span>
-                              <img alt="" className="img-fluid b-r-50 overflow-hidden" src={Avatar4} />
-                            </li>
-                            <li className="h-30 w-30 d-flex-center b-r-50 text-bg-success b-2-light position-relative" title="User">
-                              <span className="position-absolute top-0 end-0 h-10 w-10 bg-success border border-light rounded-circle"></span>
-                              <img alt="" className="img-fluid b-r-50 overflow-hidden" src={Avatar5} />
-                            </li>
-                            <li className="h-30 w-30 d-flex-center b-r-50 text-bg-danger b-2-light position-relative" title="User">
-                              <span className="position-absolute top-0 end-0 h-10 w-10 bg-danger border border-light rounded-circle"></span>
-                              <img alt="" className="img-fluid b-r-50 overflow-hidden" src={Avatar6} />
-                            </li>
-                            <li className="bg-white text-dark h-25 w-25 d-flex-center b-r-50 f-s-12">5+</li>
                           </ul>
                         </div>
                       </div>
                     </div>
-
-                    {/* Total Hours */}
-                    <div className="card shadow-sm project-total-card mb-4">
-                      <div className="card-body">
-                        <div className="d-flex position-relative">
-                          <h5 className="section-title txt-ellipsis-1">Total Hours</h5>
-                        </div>
-                        <div>
-                          <div className="d-flex justify-content-center">
-                            <h2 className="text-info-dark hour-display">00H</h2>
-                          </div>
-                          <div className="progress-labels mg-t-40">
-                            <span className="text-info">Productive</span>
-                            <span className="text-info">Middle</span>
-                            <span className="text-info">Idle</span>
-                          </div>
-                          <div className="custom-progress-container info-progress">
-                            <div className="progress-bar productive" style={{ width: '50%' }}></div>
-                            <div className="progress-bar middle" style={{ width: '30%' }}></div>
-                            <div className="progress-bar idle" style={{ width: '20%' }}></div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Orders Details */}
-              <div className="col-lg-4">
-                <div className="card shadow-sm order-detail-card">
-                  <div className="pt-3">
-                    <h5 className="section-title pa-s-20">Orders Details</h5>
-                  </div>
-                  <div className="card-body">
-                    <ul className="order-content-list">
-                      <li className="bg-success-300">
-                        <div className="d-flex align-items-center justify-content-between">
-                          <h6 className="text-success-dark f-w-600 mb-0">📦#P98056745</h6>
-                          <span className="badge text-light-success bg-light-success me-2">Delivered</span>
-                        </div>
-                        <div>
-                          <p className="text-success mb-0 txt-ellipsis-2">Your order was delivered on October 10, 2024.</p>
-                        </div>
-                      </li>
-                      <li className="bg-info-300">
-                        <div className="d-flex align-items-center justify-content-between">
-                          <h6 className="text-info-dark f-w-600 mb-0">📦#5Q145586781</h6>
-                          <span className="badge text-light-info bg-light-info me-2">Shipped</span>
-                        </div>
-                        <div>
-                          <p className="text-info mb-0 txt-ellipsis-2">Your order has been shipped and will be delivered by...</p>
-                        </div>
-                      </li>
-                      <li className="bg-danger-300">
-                        <div className="d-flex align-items-center justify-content-between">
-                          <h6 className="text-danger-dark f-w-600 mb-0">📦#8405L6715</h6>
-                          <span className="badge text-light-danger bg-light-danger me-2">Cancelled</span>
-                        </div>
-                        <div>
-                          <p className="text-danger mb-0 txt-ellipsis-2">Your order was cancelled. Date Ordered: October 14...</p>
-                        </div>
-                      </li>
-                      <li className="bg-success-300">
-                        <div className="d-flex align-items-center justify-content-between">
-                          <h6 className="text-success-dark f-w-600 mb-0">📦#H5A367890</h6>
-                          <span className="badge text-light-success bg-light-success me-2">Delivered</span>
-                        </div>
-                        <div>
-                          <p className="text-success mb-0 txt-ellipsis-2">Your order was delivered on November 30, 2024.</p>
-                        </div>
-                      </li>
-                      <li className="bg-info-300">
-                        <div className="d-flex align-items-center justify-content-between">
-                          <h6 className="text-info-dark f-w-600 mb-0">📦#78JY45672</h6>
-                          <span className="badge text-light-info bg-light-info me-2">Shipped</span>
-                        </div>
-                        <div>
-                          <p className="text-info mb-0 txt-ellipsis-2">Your order has been shipped and will be delivered by...</p>
-                        </div>
-                      </li>
-                      <li className="bg-danger-300">
-                        <div className="d-flex align-items-center justify-content-between">
-                          <h6 className="text-danger-dark f-w-600 mb-0">📦#45QRT9823</h6>
-                          <span className="badge text-light-danger bg-light-danger me-2">Cancelled</span>
-                        </div>
-                        <div>
-                          <p className="text-danger mb-0 txt-ellipsis-2">Your order was cancelled. Date Ordered: November 28...</p>
-                        </div>
-                      </li>
-                    </ul>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Calendar */}
+            <div className="row mb-4">
+              <div className="col-lg-6">
+                <div className="card shadow-sm project-total-card">
+                  <div className="card-body">
+                    <div className="d-flex position-relative">
+                      <h5 className="section-title txt-ellipsis-1">Total Hours</h5>
+                    </div>
+                    <div>
+                      {getTotalHours.total > 0 ? (
+                        <>
+                          <div className="d-flex justify-content-center">
+                            <h2 className="text-info-dark hour-display">{getTotalHours.total.toFixed(1)}H</h2>
+                          </div>
+                          <div className="progress-labels mg-t-40">
+                            <span className="text-info" title="Done or Tested tasks">Productive</span>
+                            <span className="text-info" title="Review or In Progress tasks">In Progress</span>
+                            <span className="text-info" title="To Do tasks">Idle</span>
+                          </div>
+                          <div className="custom-progress-container info-progress">
+                            <div className="progress-bar productive" style={{ width: `${getTotalHours.productive}%` }}></div>
+                            <div className="progress-bar middle" style={{ width: `${getTotalHours.middle}%` }}></div>
+                            <div className="progress-bar idle" style={{ width: `${getTotalHours.idle}%` }}></div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-center">
+                          <p>No task hours recorded</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="col-lg-6">
+                <div className="card shadow-sm">
+                  <div className="card-header">
+                    <h5 className="section-title">Project Summary</h5>
+                  </div>
+                  <div className="card-body">
+                    <p><strong>Total Projects:</strong> {getProjectStats.total}</p>
+                    <p>
+                      <strong>Completed Projects:</strong> {getProjectStats.completed} (
+                      {((getProjectStats.completed / getProjectStats.total) * 100 || 0).toFixed(1)}%)
+                    </p>
+                    <p><strong>In Progress Projects:</strong> {getProjectStats.inProgress}</p>
+                    <p><strong>Pending Projects:</strong> {getProjectStats.pending}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div className="row mb-4">
               <div className="col-12">
                 <div className="container-fluid">
@@ -681,18 +1075,16 @@ const Dashboardd = () => {
                           <FullCalendar
                             plugins={[dayGridPlugin]}
                             initialView="dayGridMonth"
-                            events={[
-                              { title: 'kkck', date: '2025-04-07' },
-                              { title: 'Event 2', date: '2025-04-15' },
-                            ]}
+                            events={calendarEvents}
                             headerToolbar={{
                               left: 'prev,next',
                               center: 'title',
-                              right: 'dayGridMonth,dayGridWeek,dayGridDay,listWeek'
+                              right: 'dayGridMonth,dayGridWeek,dayGridDay,listWeek',
                             }}
                             height="auto"
                             eventBackgroundColor="#6f42c1"
                             eventBorderColor="#6f42c1"
+                            eventClick={handleEventClick}
                           />
                         </div>
                       </div>
@@ -719,15 +1111,14 @@ const Dashboardd = () => {
                 <div className="text-end position-relative z-1">
                   <X className="fs-5 text-dark f-w-600" data-bs-dismiss="modal" />
                 </div>
-                <h2 className="f-w-700 text-primary-dark mb-0">
-                  <span>Welcome!</span>
-                  <img alt="gif" className="w-45 d-inline align-baseline" src={CelebrationGif} />
-                </h2>
-                <div className="modal-img-box">
-                  <img alt="img" className="img-fluid" src={WelcomeImage} />
-                </div>
+                
                 <div className="modal-btn mb-4">
-                  <button className="btn btn-primary text-white btn-sm rounded" data-bs-dismiss="modal" type="button">
+                  <button
+                    className="btn btn-primary text-white btn-sm rounded"
+                    data-bs-dismiss="modal"
+                    type="button"
+                    aria-label="Get Started"
+                  >
                     Get Started
                   </button>
                 </div>
@@ -736,8 +1127,175 @@ const Dashboardd = () => {
           </div>
         </div>
       </div>
+
+      <Modal show={showModal} onHide={handleCloseModal}>
+        <Modal.Header closeButton>
+          <Modal.Title>Project Details</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {selectedProject ? (
+            <div>
+              <h5 dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(selectedProject.name) }} />
+              <p>
+                <strong>Description:</strong>{' '}
+                {DOMPurify.sanitize(selectedProject.description || 'No description')}
+              </p>
+              <p>
+                <strong>Objectives:</strong>{' '}
+                {selectedProject.objectives?.join(', ') || 'No objectives'}
+              </p>
+              <p><strong>Status:</strong> {selectedProject.status}</p>
+              <p>
+                <strong>Start Date:</strong>{' '}
+                {new Date(selectedProject.startDate).toLocaleDateString('en-US')}
+              </p>
+              <p>
+                <strong>End Date:</strong>{' '}
+                {new Date(selectedProject.endDate).toLocaleDateString('en-US')}
+              </p>
+            </div>
+          ) : (
+            <p>No details available.</p>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={handleCloseModal}>
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      <Modal show={showTaskModal} onHide={handleCloseTaskModal}>
+        <Modal.Header closeButton>
+          <Modal.Title>Task Details</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {selectedTask ? (
+            <div>
+              {['Admin', 'Project Manager', 'Team Leader'].includes(role) ? (
+                <Form>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Title</Form.Label>
+                    <Form.Control
+                      type="text"
+                      name="title"
+                      value={taskForm.title}
+                      onChange={handleFormChange}
+                      required
+                    />
+                  </Form.Group>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Description</Form.Label>
+                    <Form.Control
+                      as="textarea"
+                      name="description"
+                      value={taskForm.description}
+                      onChange={handleFormChange}
+                    />
+                  </Form.Group>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Start Date</Form.Label>
+                    <Form.Control
+                      type="date"
+                      name="startDate"
+                      value={taskForm.startDate}
+                      onChange={handleFormChange}
+                    />
+                  </Form.Group>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Due Date</Form.Label>
+                    <Form.Control
+                      type="date"
+                      name="dueDate"
+                      value={taskForm.dueDate}
+                      onChange={handleFormChange}
+                    />
+                  </Form.Group>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Status</Form.Label>
+                    <Form.Select
+                      name="status"
+                      value={taskForm.status}
+                      onChange={handleFormChange}
+                    >
+                      <option value="To Do">To Do</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Review">Review</option>
+                      <option value="Tested">Tested</option>
+                      <option value="Done">Done</option>
+                    </Form.Select>
+                  </Form.Group>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Priority</Form.Label>
+                    <Form.Select
+                      name="priority"
+                      value={taskForm.priority}
+                      onChange={handleFormChange}
+                    >
+                      <option value="Low">Low</option>
+                      <option value="Medium">Medium</option>
+                      <option value="High">High</option>
+                      <option value="Urgent">Urgent</option>
+                    </Form.Select>
+                  </Form.Group>
+                </Form>
+              ) : (
+                <>
+                  <h5 dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(selectedTask.title) }} />
+                  <p>
+                    <strong>Description:</strong>{' '}
+                    {DOMPurify.sanitize(selectedTask.description || 'No description')}
+                  </p>
+                  <p><strong>Status:</strong> {selectedTask.status}</p>
+                  <p><strong>Priority:</strong> {selectedTask.priority}</p>
+                  <p>
+                    <strong>Start Date:</strong> {selectedTask.formattedStartDate}
+                  </p>
+                  <p>
+                    <strong>Due Date:</strong> {selectedTask.formattedDueDate}
+                  </p>
+                  <p>
+                    <strong>Assigned To:</strong> {selectedTask.assignedToNames}
+                  </p>
+                  <p>
+                    <strong>Project:</strong>{' '}
+                    {selectedTask.project?.name || 'N/A'}
+                  </p>
+                </>
+              )}
+            </div>
+          ) : (
+            <p>No details available.</p>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={handleCloseTaskModal}>
+            Close
+          </Button>
+          {['Admin', 'Project Manager', 'Team Leader'].includes(role) && selectedTask && (
+            <>
+              <Button
+                variant="primary"
+                onClick={handleUpdateTask}
+                aria-label="Update Task"
+              >
+                Update Task
+              </Button>
+              <Button
+                variant="danger"
+                onClick={handleDeleteTask}
+                aria-label="Delete Task"
+              >
+                Delete Task
+              </Button>
+            </>
+          )}
+        </Modal.Footer>
+      </Modal>
+
+      <ToastContainer position="top-right" autoClose={5000} hideProgressBar={false} />
     </div>
   );
 };
 
-export default Dashboardd;
+export default Dashboard;

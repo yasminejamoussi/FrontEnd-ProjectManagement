@@ -4,7 +4,7 @@ import { NavLink } from 'react-router-dom';
 import axios from 'axios';
 import Header from "../Layout/Header";
 import Sidebar from "../Layout/Sidebar";
-import logo1 from '../../assets/images/icons/logo1.png';
+import logo1 from '../../assets/images/avtar/user.jpg';
 import { jwtDecode } from "jwt-decode";
 
 const ProjectsDashboard = () => {
@@ -27,33 +27,64 @@ const ProjectsDashboard = () => {
     status: 'To Do',
     priority: 'Medium',
     assignedTo: [],
-    startDate: '', // Ajouté
-    dueDate: '',   // Ajouté
+    startDate: '',
+    dueDate: '',
   });
+  const [suggestedUsers, setSuggestedUsers] = useState([]);
+  const [isSuggestingUsers, setIsSuggestingUsers] = useState(false);
+  const [taskList, setTaskList] = useState([]);
   const [predictedDuration, setPredictedDuration] = useState(null);
   const [isSuggestingPriority, setIsSuggestingPriority] = useState(false);
-  const [taskList, setTaskList] = useState([]);
+  const [selectedTeamMembers, setSelectedTeamMembers] = useState([]);
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       const jwtToken = localStorage.getItem("token");
+      let userRole = 'Guest';
+      let userId = null;
+
       if (jwtToken) {
         const decoded = jwtDecode(jwtToken);
-        setUserRole(decoded?.role || 'Guest');
-        setUserId(decoded?.id);
+        userRole = decoded?.role || 'Guest';
+        userId = decoded?.id;
+        setUserRole(userRole);
+        setUserId(userId);
       }
 
       try {
         const [projectsResponse, usersResponse] = await Promise.all([
-          axios.get("http://localhost:4000/api/projects", { params: { ...filters, ...sort } }),
-          axios.get("http://localhost:4000/api/auth/users"),
+          axios.get("http://localhost:4000/api/projects", {
+            headers: { Authorization: `Bearer ${jwtToken}` },
+            params: { ...filters, ...sort }
+          }),
+          axios.get("http://localhost:4000/api/auth/users", {
+            headers: { Authorization: `Bearer ${jwtToken}` }
+          }),
         ]);
-        console.log("Utilisateurs récupérés :", usersResponse.data);
-        setProjects(projectsResponse.data);
-        setUsers(usersResponse.data);
+
+        const allProjects = projectsResponse.data || [];
+        const allUsers = usersResponse.data || [];
+
+        let filteredProjects = allProjects;
+        if (userRole === 'Project Manager') {
+          filteredProjects = allProjects.filter(
+            (project) => project.projectManager?._id === userId
+          );
+        } else if (userRole === 'Team Leader' || userRole === 'Team Member') {
+          filteredProjects = allProjects.filter(
+            (project) =>
+              project.projectManager?._id === userId ||
+              project.teamMembers?.some((member) => member._id === userId)
+          );
+        } else if (userRole === 'Guest') {
+          filteredProjects = [];
+        }
+
+        setProjects(filteredProjects);
+        setUsers(allUsers);
       } catch (error) {
-        setError(error.message);
+        setError(error.response?.data?.message || error.message);
       } finally {
         setLoading(false);
       }
@@ -61,13 +92,23 @@ const ProjectsDashboard = () => {
     fetchData();
   }, [filters, sort]);
 
+  useEffect(() => {
+    if (editingProject) {
+      setSelectedTeamMembers(editingProject.teamMembers.map(member => member._id || member));
+    } else {
+      setSelectedTeamMembers([]);
+    }
+  }, [editingProject]);
+
   const handleAddProject = async (projectData) => {
     setIsSubmitting(true);
     setError(null);
     setSuccess(null);
     try {
-      const response = await axios.post("http://localhost:4000/api/projects", projectData);
-      setProjects([...projects, response.data]);
+      const response = await axios.post("http://localhost:4000/api/projects", projectData, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      });
+      setProjects([...projects, response.data.project]);
       setSuccess("Projet ajouté avec succès !");
       setShowModal(false);
     } catch (error) {
@@ -76,10 +117,10 @@ const ProjectsDashboard = () => {
       setIsSubmitting(false);
     }
   };
-  ////////////////////////////////////////////////////////////////
+
   const suggestPriorityWithIA = async () => {
     if (!newTask.title) {
-      setError("Please enter a task title before requesting an AI suggestion.");
+      setError("Veuillez entrer un titre de tâche avant de demander une suggestion IA.");
       return;
     }
 
@@ -90,16 +131,19 @@ const ProjectsDashboard = () => {
       const response = await axios.post('http://localhost:4000/api/prioritize', {
         title: newTask.title,
         description: newTask.description || '',
+      }, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
       });
       const { priority } = response.data;
       setNewTask(prev => ({ ...prev, priority }));
-      setSuccess(`AI-suggested priority: ${priority}`);
+      setSuccess(`AI suggested priority : ${priority}`);
     } catch (err) {
-      setError("Failed to get AI suggestion: " + (err.response?.data?.error || err.message));
+      setError("Échec de la suggestion IA : " + (err.response?.data?.error || err.message));
     } finally {
       setIsSuggestingPriority(false);
     }
   };
+
   const handleTaskInputChange = (e) => {
     const { name, value } = e.target;
     setNewTask(prev => ({ ...prev, [name]: value }));
@@ -110,14 +154,19 @@ const ProjectsDashboard = () => {
     setNewTask(prev => ({ ...prev, assignedTo: selected }));
   };
 
-  ////////////////////////////////
+  const handleTeamSelectionChange = (e) => {
+    const selected = Array.from(e.target.selectedOptions, option => option.value);
+    setSelectedTeamMembers(selected);
+  };
 
   const handleUpdateProject = async (projectData) => {
     setIsSubmitting(true);
     setError(null);
     setSuccess(null);
     try {
-      const response = await axios.put(`http://localhost:4000/api/projects/${editingProject._id}`, projectData);
+      const response = await axios.put(`http://localhost:4000/api/projects/${editingProject._id}`, projectData, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      });
       setProjects(projects.map(project => project._id === editingProject._id ? response.data : project));
       setSuccess("Projet modifié avec succès !");
       setShowModal(false);
@@ -129,6 +178,59 @@ const ProjectsDashboard = () => {
     }
   };
 
+  const suggestUsersBasedOnDeliverables = async (deliverables) => {
+    if (!deliverables || deliverables.trim() === "") {
+      setSuggestedUsers([]);
+      return;
+    }
+  
+    setIsSuggestingUsers(true);
+    setSuggestedUsers([]);
+    setError(null);
+  
+    try {
+      console.log("📝 Envoi des livrables pour suggestion :", deliverables);
+  
+      const tempProjectData = {
+        name: "Temp Project",
+        description: "Temporary project for skill extraction",
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: new Date().toISOString().split('T')[0],
+        deliverables: deliverables.split(',').map(item => item.trim()).filter(item => item),
+        objectives: [],
+        projectManager: userId,
+        teamMembers: [],
+        tasks: [],
+      };
+  
+      console.log("📦 Création du projet temporaire :", tempProjectData);
+  
+      const response = await axios.post("http://localhost:4000/api/projects", tempProjectData, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      });
+      const projectId = response.data.project._id;
+      console.log("✅ Projet temporaire créé avec l’ID :", projectId);
+  
+      const matchResponse = await axios.get(`http://localhost:4000/api/projects/${projectId}/match-users`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      });
+      console.log("✅ Réponse de matchUsersToProject :", matchResponse.data);
+  
+      setSuggestedUsers(matchResponse.data.matchedUsers || []);
+  
+      await axios.delete(`http://localhost:4000/api/projects/${projectId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      });
+      console.log("🗑️ Projet temporaire supprimé");
+    } catch (error) {
+      console.error("❌ Error suggesting users :", error);
+      setError("Error suggesting users : " + (error.response?.data?.message || error.message));
+      setSuggestedUsers([]);
+    } finally {
+      setIsSuggestingUsers(false);
+    }
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     const projectData = {
@@ -136,34 +238,37 @@ const ProjectsDashboard = () => {
       description: e.target.projectDescription.value,
       startDate: e.target.startDate.value,
       endDate: e.target.endDate.value,
-      status: e.target.status.value,
       teamMembers: Array.from(e.target.team.selectedOptions).map(option => option.value),
-      deliverables: e.target.deliverables.value.split(',').map(item => item.trim()),
-      objectives: e.target.objectives.value.split(',').map(item => item.trim()),
+      deliverables: e.target.deliverables.value.split(',').map(item => item.trim()).filter(item => item),
+      objectives: e.target.objectives.value.split(',').map(item => item.trim()).filter(item => item),
       tasks: taskList,
     };
-
+  
     if (!editingProject) {
       projectData.projectManager = userId;
     }
-
+  
     if (new Date(projectData.endDate) < new Date(projectData.startDate)) {
       setError("La date de fin doit être après la date de début.");
       return;
     }
-
+  
     if (editingProject) {
       handleUpdateProject(projectData);
     } else {
       handleAddProject(projectData);
     }
-    setShowModal(false); //khalil
-    setPredictedDuration(null);//khalil
+    setShowModal(false);
+    setPredictedDuration(null);
+    setSuggestedUsers([]);
+    setSelectedTeamMembers([]);
   };
 
   const handleDeleteProject = async (projectId) => {
     try {
-      await axios.delete(`http://localhost:4000/api/projects/${projectId}`);
+      await axios.delete(`http://localhost:4000/api/projects/${projectId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      });
       setProjects(projects.filter(project => project._id !== projectId));
     } catch (error) {
       setError(error.response?.data?.message || error.message);
@@ -172,7 +277,6 @@ const ProjectsDashboard = () => {
 
   const addTaskToList = () => {
     if (newTask.title.trim()) {
-      // Validation des dates si elles sont fournies
       if (newTask.dueDate && newTask.startDate && new Date(newTask.dueDate) < new Date(newTask.startDate)) {
         setError("La date d'échéance de la tâche ne peut pas être antérieure à la date de début.");
         return;
@@ -190,7 +294,6 @@ const ProjectsDashboard = () => {
     return new Date(dateString).toLocaleDateString('fr-FR');
   };
 
-  //Project-deadline-prediction(khalil)
   const suggestEndDate = async () => {
     try {
       const projectData = {
@@ -199,10 +302,12 @@ const ProjectsDashboard = () => {
         teamMembers: Array.from(document.getElementById("team").selectedOptions).map(option => option.value)
       };
 
-      const response = await axios.post("http://localhost:4000/api/projects/predict", projectData);
+      const response = await axios.post("http://localhost:4000/api/projects/predict", projectData, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      });
       const endDate = new Date(response.data.predictedEndDate);
       document.getElementById("endDate").value = endDate.toISOString().split("T")[0];
-      setPredictedDuration(response.data.predictedDuration); // Met à jour la durée ici
+      setPredictedDuration(response.data.predictedDuration);
     } catch (error) {
       setError("Erreur lors de la prédiction : " + error.message);
     }
@@ -249,49 +354,122 @@ const ProjectsDashboard = () => {
       <div className="app-content" style={{ flex: 1 }}>
         <main>
           <div className="container-fluid">
-            <div className="row m-1">
-              <div className="col-12">
-                <h1 className="main-title">Projects</h1>
-              </div>
+            <br></br>
+            <div className="d-flex justify-content-between align-items-center mb-4">
+              <h4 className="section-title f-w-700">Projects</h4>
+              {(userRole === "Admin" || userRole === "Project Manager") && (
+                <button
+                  id="newProject"
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ minWidth: '150px', height: '38px', borderRadius: '5px', lineHeight: '1.5' }}
+                  onClick={() => { setShowModal(true); setPredictedDuration(null); setSuggestedUsers([]); }}
+                  aria-label="Add new project"
+                >
+                  <i className="ti ti-plus"></i> New project
+                </button>
+              )}
             </div>
 
-            <div className="row mb-3">
+            <div className="row mb-4">
               <div className="col-12">
-                <form className="d-flex flex-wrap gap-3">
-                  <select name="status" value={filters.status} onChange={handleFilterChange} className="form-control w-auto">
-                    <option value="">All statuses</option>
-                    <option value="Pending">Pending</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Completed">Completed</option>
-                  </select>
-                  <select name="projectManager" value={filters.projectManager} onChange={handleFilterChange} className="form-control w-auto">
-                    <option value="">All managers</option>
-                    {users.filter(u => ["Project Manager", "Admin"].includes(u.role?.name)).map(user => (
-                      <option key={user._id} value={user._id}>{user.firstname} {user.lastname}</option>
-                    ))}
-                  </select>
-                  <input type="date" name="startDate" value={filters.startDate} onChange={handleFilterChange} className="form-control w-auto" />
-                  <input type="date" name="endDate" value={filters.endDate} onChange={handleFilterChange} className="form-control w-auto" />
-                  <select name="sortBy" value={sort.sortBy} onChange={handleSortChange} className="form-control w-auto">
-                    <option value="">Sort by...</option>
-                    <option value="name">Name</option>
-                    <option value="startDate">Start date</option>
-                    <option value="endDate">End date</option>
-                  </select>
-                  <select name="order" value={sort.order} onChange={handleSortChange} className="form-control w-auto">
-                    <option value="asc">Ascending</option>
-                    <option value="desc">Descending</option>
-                  </select>
-                  {(userRole === "Admin" || userRole === "Project Manager") && (
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={() => { setShowModal(true); setPredictedDuration(null); }}
-                    >
-                      <i className="ti ti-plus"></i> New project
-                    </button>
-                  )}
-                </form>
+                <div className="card shadow-sm p-3" style={{ backgroundColor: '#f8f9fa', borderRadius: '10px' }}>
+                  <h5 style={{ color: '#34495e', marginBottom: '15px' }}>Filters</h5>
+                  <form className="d-flex flex-wrap gap-3 align-items-end">
+                    <div className="form-group">
+                      <label htmlFor="filterStatus" className="form-label" style={{ color: '#7f8c8d' }}>Status</label>
+                      <select
+                        id="filterStatus"
+                        name="status"
+                        className="form-select"
+                        style={{ minWidth: '150px', borderColor: '#ced4da', borderRadius: '5px' }}
+                        value={filters.status}
+                        onChange={handleFilterChange}
+                        aria-label="Filter by status"
+                      >
+                        <option value="">All statuses</option>
+                        <option value="Pending">Pending</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Completed">Completed</option>
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="filterProjectManager" className="form-label" style={{ color: '#7f8c8d' }}>Project Manager</label>
+                      <select
+                        id="filterProjectManager"
+                        name="projectManager"
+                        className="form-select"
+                        style={{ minWidth: '150px', borderColor: '#ced4da', borderRadius: '5px' }}
+                        value={filters.projectManager}
+                        onChange={handleFilterChange}
+                        aria-label="Filter by project manager"
+                      >
+                        <option value="">All managers</option>
+                        {users.filter(u => ["Project Manager", "Admin"].includes(u.role?.name)).map(user => (
+                          <option key={user._id} value={user._id}>{user.firstname} {user.lastname}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="filterStartDate" className="form-label" style={{ color: '#7f8c8d' }}>Start Date</label>
+                      <input
+                        id="filterStartDate"
+                        type="date"
+                        name="startDate"
+                        className="form-control"
+                        style={{ minWidth: '150px', borderColor: '#ced4da', borderRadius: '5px' }}
+                        value={filters.startDate}
+                        onChange={handleFilterChange}
+                        aria-label="Filter by start date"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="filterEndDate" className="form-label" style={{ color: '#7f8c8d' }}>End Date</label>
+                      <input
+                        id="filterEndDate"
+                        type="date"
+                        name="endDate"
+                        className="form-control"
+                        style={{ minWidth: '150px', borderColor: '#ced4da', borderRadius: '5px' }}
+                        value={filters.endDate}
+                        onChange={handleFilterChange}
+                        aria-label="Filter by end date"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="sortBy" className="form-label" style={{ color: '#7f8c8d' }}>Sort By</label>
+                      <select
+                        id="sortBy"
+                        name="sortBy"
+                        className="form-select"
+                        style={{ minWidth: '150px', borderColor: '#ced4da', borderRadius: '5px' }}
+                        value={sort.sortBy}
+                        onChange={handleSortChange}
+                        aria-label="Sort by"
+                      >
+                        <option value="">Sort by...</option>
+                        <option value="name">Name</option>
+                        <option value="startDate">Start date</option>
+                        <option value="endDate">End date</option>
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="sortOrder" className="form-label" style={{ color: '#7f8c8d' }}>Order</label>
+                      <select
+                        id="sortOrder"
+                        name="order"
+                        className="form-select"
+                        style={{ minWidth: '150px', borderColor: '#ced4da', borderRadius: '5px' }}
+                        value={sort.order}
+                        onChange={handleSortChange}
+                        aria-label="Sort order"
+                      >
+                        <option value="asc">Ascending</option>
+                        <option value="desc">Descending</option>
+                      </select>
+                    </div>
+                  </form>
+                </div>
               </div>
             </div>
 
@@ -318,7 +496,7 @@ const ProjectsDashboard = () => {
                                 <a
                                   className="dropdown-item"
                                   href="#"
-                                  onClick={() => { setEditingProject(project); setTaskList(project.tasks || []); setShowModal(true); }}
+                                  onClick={() => { setEditingProject(project); setTaskList(project.tasks || []); setShowModal(true); setSuggestedUsers([]); }}
                                 >
                                   <i className="ti ti-edit text-success"></i> Edit
                                 </a>
@@ -399,7 +577,7 @@ const ProjectsDashboard = () => {
                       <button
                         type="button"
                         className="btn-close"
-                        onClick={() => { setShowModal(false); setEditingProject(null); setTaskList([]); setSuccess(null); setError(null); }}
+                        onClick={() => { setShowModal(false); setEditingProject(null); setTaskList([]); setSuccess(null); setError(null); setSuggestedUsers([]); setSelectedTeamMembers([]); }}
                       />
                     </div>
                     <div className="modal-body">
@@ -427,7 +605,6 @@ const ProjectsDashboard = () => {
                             defaultValue={editingProject?.endDate ? new Date(editingProject.endDate).toISOString().split('T')[0] : ""}
                             required
                           />
-                          {/* Project-deadline-prediction(khalil) */}
                           <div className="mb-3">
                             <div className='text-center'>
                               <button type="button" className="btn btn-primary mt-2" onClick={suggestEndDate}>
@@ -440,27 +617,8 @@ const ProjectsDashboard = () => {
                           </div>
                         </div>
                         <div className="mb-3">
-                          <label htmlFor="status" className="form-label">Status</label>
-                          <select className="form-control" id="status" defaultValue={editingProject?.status || ""} required>
-                            <option value="" disabled>Select a status</option>
-                            <option value="Pending">Pending</option>
-                            <option value="In Progress">In Progress</option>
-                            <option value="Completed">Completed</option>
-                          </select>
-                        </div>
-                        <div className="mb-3">
                           <label htmlFor="projectDescription" className="form-label">Description</label>
                           <textarea className="form-control" rows="5" id="projectDescription" defaultValue={editingProject?.description || ""} />
-                        </div>
-                        <div className="mb-3">
-                          <label htmlFor="team" className="form-label">Team project</label>
-                          <select className="form-control" id="team" multiple defaultValue={editingProject?.teamMembers || []} style={{ height: '150px' }}>
-                            {users.filter(user => ["Team Leader", "Team Member"].includes(user.role?.name)).map(user => (
-                              <option key={user._id} value={user._id}>
-                                {user.firstname} {user.lastname} ({user.role?.name || "Rôle non défini"})
-                              </option>
-                            ))}
-                          </select>
                         </div>
                         <div className="mb-3">
                           <label htmlFor="deliverables" className="form-label">Deliverables</label>
@@ -470,7 +628,64 @@ const ProjectsDashboard = () => {
                             id="deliverables"
                             defaultValue={editingProject?.deliverables?.join(', ') || ""}
                             placeholder="Separated by commas"
+                            onBlur={(e) => {
+                              console.log("📌 onBlur déclenché avec la valeur :", e.target.value);
+                              if (e.target.value) {
+                                suggestUsersBasedOnDeliverables(e.target.value);
+                              } else {
+                                setSuggestedUsers([]);
+                              }
+                            }}
                           />
+                        </div>
+                        {isSuggestingUsers && (
+                          <div className="mb-3">
+                            <p className="text-muted">Chargement des suggestions...</p>
+                          </div>
+                        )}
+                        {suggestedUsers.length > 0 && (
+                          <div className="mb-3">
+                            <h5>Suggested Users</h5>
+                            <ul className="list-group">
+                              {suggestedUsers.map(user => (
+                                <li key={user.id} className="list-group-item">
+                                  <div className="d-flex justify-content-between align-items-center">
+                                    <div>
+                                      <strong>{user.firstname} {user.lastname}</strong> ({user.role})<br />
+                                      <small>Skills: {user.skills.join(', ')}</small><br />
+                                      <small>Corresponding skills: {user.commonSkills.join(', ')}</small><br />
+                                      <small>Assigned tasks: {user.taskCount}</small>
+                                    </div>
+                                    <div>
+                                      <span className="badge bg-success">Score: {user.score}%</span>
+                                    </div>
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {suggestedUsers.length === 0 && !isSuggestingUsers && error && (
+                          <div className="mb-3">
+                            <p className="text-danger">{error}</p>
+                          </div>
+                        )}
+                        <div className="mb-3">
+                          <label htmlFor="team" className="form-label">Team project</label>
+                          <select
+                            className="form-control"
+                            id="team"
+                            multiple
+                            defaultValue={editingProject?.teamMembers.map(member => member._id || member) || []}
+                            style={{ height: '150px' }}
+                            onChange={handleTeamSelectionChange}
+                          >
+                            {users.filter(user => ["Team Leader", "Team Member"].includes(user.role?.name)).map(user => (
+                              <option key={user._id} value={user._id}>
+                                {user.firstname} {user.lastname} ({user.role?.name || "Rôle non défini"})
+                              </option>
+                            ))}
+                          </select>
                         </div>
                         <div className="mb-3">
                           <label htmlFor="objectives" className="form-label">Objectives</label>
@@ -550,11 +765,17 @@ const ProjectsDashboard = () => {
                                 onChange={(e) => setNewTask({ ...newTask, assignedTo: Array.from(e.target.selectedOptions).map(opt => opt.value) })}
                                 style={{ height: '100px' }}
                               >
-                                {users.filter(user => ["Team Leader", "Team Member"].includes(user.role?.name)).map(user => (
-                                  <option key={user._id} value={user._id}>
-                                    {user.firstname} {user.lastname}
-                                  </option>
-                                ))}
+                                {selectedTeamMembers.length > 0 ? (
+                                  users
+                                    .filter(user => selectedTeamMembers.includes(user._id))
+                                    .map(user => (
+                                      <option key={user._id} value={user._id}>
+                                        {user.firstname} {user.lastname} ({user.role?.name || "Rôle non défini"})
+                                      </option>
+                                    ))
+                                ) : (
+                                  <option disabled>No team members selected</option>
+                                )}
                               </select>
                             </div>
                           </div>
@@ -596,6 +817,15 @@ const ProjectsDashboard = () => {
                                     {task.title} ({task.status}, {task.priority})
                                     {task.startDate && ` - Start: ${formatDate(task.startDate)}`}
                                     {task.dueDate && ` - Deadline: ${formatDate(task.dueDate)}`}
+                                    {task.assignedTo.length > 0 && (
+                                      ` - Assigned to: ${task.assignedTo
+                                        .map(userId => {
+                                          const user = users.find(u => u._id === userId);
+                                          return user ? `${user.firstname} ${user.lastname}` : "Unknown";
+                                        })
+                                        .join(", ")
+                                      }`
+                                    )}
                                   </span>
                                   <button
                                     type="button"
@@ -615,7 +845,7 @@ const ProjectsDashboard = () => {
                           <button
                             type="button"
                             className="btn btn-secondary"
-                            onClick={() => { setShowModal(false); setEditingProject(null); setTaskList([]); setSuccess(null); setError(null); setPredictedDuration(null); }}
+                            onClick={() => { setShowModal(false); setEditingProject(null); setTaskList([]); setSuccess(null); setError(null); setPredictedDuration(null); setSuggestedUsers([]); setSelectedTeamMembers([]); }}
                           >
                             Close
                           </button>

@@ -6,9 +6,9 @@ import initializeKanbanBoard from '../../assets/js/kanban_board.js';
 import Header from "../Layout/Header";
 import Sidebar from "../Layout/Sidebar";
 import { jwtDecode } from "jwt-decode";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, } from 'recharts';
-import Modal from 'react-bootstrap/Modal'; // Import Modal from react-bootstrap
-import Button from 'react-bootstrap/Button'; // Import Button for the close button
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import Modal from 'react-bootstrap/Modal';
+import Button from 'react-bootstrap/Button';
 
 const KanbanBoard = () => {
   const { projectId } = useParams();
@@ -21,10 +21,11 @@ const KanbanBoard = () => {
   const [renderKey, setRenderKey] = useState(0);
   const [showForm, setShowForm] = useState(false);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [userRole, setUserRole] = useState(null);
   const [productivityData, setProductivityData] = useState([]);
   const [productivityLoading, setProductivityLoading] = useState(false);
   const [productivityError, setProductivityError] = useState(null);
-  const [showProductivityModal, setShowProductivityModal] = useState(false); // State to control the modal
+  const [showProductivityModal, setShowProductivityModal] = useState(false);
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
@@ -39,11 +40,47 @@ const KanbanBoard = () => {
   const gridsRef = useRef(null);
   const boardRef = useRef(null);
 
+  // Fonction utilitaire pour gérer les erreurs HTTP
+  const handleApiError = (error) => {
+    if (error.response) {
+      const { status, data } = error.response;
+      switch (status) {
+        case 403:
+          return "Accès interdit : Vous n'avez pas les permissions nécessaires pour effectuer cette action.";
+        case 422:
+          return "Erreur de validation : Veuillez vérifier les données saisies et réessayer.";
+        case 404:
+          return "Ressource non trouvée : Le projet ou la tâche demandée n'existe pas.";
+        case 500:
+          return "Erreur serveur : Une erreur s'est produite. Veuillez réessayer plus tard.";
+        default:
+          return data.message || `Erreur ${status} : Une erreur inattendue s'est produite.`;
+      }
+    }
+    return error.message || "Erreur réseau : Vérifiez votre connexion et réessayez.";
+  };
+
+  // Effacer les messages d'erreur après 5 secondes
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
+  useEffect(() => {
+    if (productivityError) {
+      const timer = setTimeout(() => setProductivityError(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [productivityError]);
+
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (token) {
       const decoded = jwtDecode(token);
       setCurrentUserId(decoded.id);
+      setUserRole(decoded?.role || 'Guest');
     } else {
       setError("User not authenticated. Please log in.");
     }
@@ -67,12 +104,16 @@ const KanbanBoard = () => {
         setTasks(normalizedTasks);
         setProjectName(projectResponse.data.name || '');
         setUsers(usersResponse.data || []);
-        const normalizedTeamMembers = (projectResponse.data.teamMembers || []).map(id => id.toString());
+        const normalizedTeamMembers = (projectResponse.data.teamMembers || []).map(member => {
+          if (typeof member === 'string') return member;
+          if (member && member._id) return member._id.toString();
+          return null;
+        }).filter(id => id);
         setTeamMembers(normalizedTeamMembers);
         console.log("Normalized tasks:", normalizedTasks);
         console.log("Normalized team members:", normalizedTeamMembers);
       } catch (err) {
-        setError(err.response?.data?.message || err.message);
+        setError(handleApiError(err));
         setTasks([]);
       } finally {
         setIsLoading(false);
@@ -89,17 +130,30 @@ const KanbanBoard = () => {
         }
         const { columnGrids } = initializeKanbanBoard();
         gridsRef.current = columnGrids;
-
+  
         columnGrids.forEach((grid, index) => {
           grid.on('dragReleaseEnd', async (item) => {
             const taskId = item.getElement().dataset.taskId;
             const newStatus = getColumnStatus(index);
             try {
-              await axios.put(`http://localhost:4000/api/tasks/${taskId}`, { status: newStatus });
-              setTasks(prevTasks => prevTasks.map(task => task._id === taskId ? { ...task, status: newStatus } : task));
+              const token = localStorage.getItem("token");
+              await axios.put(
+                `http://localhost:4000/api/tasks/${taskId}`,
+                { status: newStatus },
+                { headers: { Authorization: `Bearer ${token}` } }
+              );
+              setTasks(prevTasks =>
+                prevTasks.map(task =>
+                  task._id === taskId ? { ...task, status: newStatus } : task
+                )
+              );
               setRenderKey(prev => prev + 1);
             } catch (err) {
-              setError(err.response?.data?.message || err.message);
+              const errorMessage = handleApiError(err);
+              setError(errorMessage);
+              // Optionnel : Revenir à l'état précédent si la mise à jour échoue
+              setTasks(prevTasks => prevTasks); // Rétablir les tâches
+              setRenderKey(prev => prev + 1); // Forcer un re-rendu pour remettre la tâche à sa place
             }
           });
         });
@@ -154,22 +208,21 @@ const KanbanBoard = () => {
       alert(`AI-suggested priority: ${priority}`);
     } catch (err) {
       console.error("AI prioritization error:", err);
-      setError("Failed to get AI suggestion: " + (err.response?.data?.error || err.message));
+      setError(handleApiError(err));
     }
   };
 
-  //predicttask
   const predictTaskDuration = async () => {
     const task = editTask || newTask;
-    console.log("Début de predictTaskDuration, task:", task); // Log 1
+    console.log("Début de predictTaskDuration, task:", task);
     if (!task.title || !task.startDate) {
       setError("Veuillez entrer un titre et une date de début avant de demander une prédiction.");
-      console.log("Erreur: titre ou startDate manquant"); // Log 2
+      console.log("Erreur: titre ou startDate manquant");
       return;
     }
     try {
       const token = localStorage.getItem("token");
-      console.log("Token:", token); // Log 3
+      console.log("Token:", token);
       console.log("Envoi de la requête POST avec:", {
         title: task.title,
         description: task.description || '',
@@ -178,7 +231,7 @@ const KanbanBoard = () => {
         assignedTo: task.assignedTo,
         project: projectId,
         startDate: task.startDate,
-      }); // Log 4
+      });
       const response = await axios.post('http://localhost:4000/api/tasks/predict-duration', {
         title: task.title,
         description: task.description || '',
@@ -190,7 +243,7 @@ const KanbanBoard = () => {
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      console.log("Réponse de l’API:", response.data); // Log 5
+      console.log("Réponse de l’API:", response.data);
       const { estimatedDueDate } = response.data;
       setSuggestedDueDate(estimatedDueDate.split('T')[0]);
       if (editTask) {
@@ -199,37 +252,36 @@ const KanbanBoard = () => {
         setNewTask(prev => ({ ...prev, dueDate: estimatedDueDate.split('T')[0] }));
       }
     } catch (err) {
-      console.error("Erreur dans predictTaskDuration:", err); // Log 6
-      setError("Échec de la prédiction : " + (err.response?.data?.error || err.message));
+      console.error("Erreur dans predictTaskDuration:", err);
+      setError(handleApiError(err));
     }
   };
-  ///////////////graph 
+
   const fetchProductivityData = async () => {
     setProductivityLoading(true);
     setProductivityError(null);
     try {
       const response = await axios.get(`http://localhost:4000/api/productivity/${projectId}`);
       console.log('Productivity data received:', response.data);
-      setProductivityData([response.data]); // Convert the object to an array for compatibility with existing rendering
+      setProductivityData([response.data]);
     } catch (err) {
-      setProductivityError('Error fetching productivity data.');
+      setProductivityError(handleApiError(err));
       console.error(err);
     } finally {
       setProductivityLoading(false);
-      setShowProductivityModal(true); // Open the modal after loading the data
+      setShowProductivityModal(true);
     }
   };
 
-  // Handle click on the button to generate the chart
   const handleGenerateChart = () => {
     fetchProductivityData();
   };
 
-  // Close the modal
   const handleCloseModal = () => {
     setShowProductivityModal(false);
-    setProductivityData([]); // Reset data to avoid unwanted displays
+    setProductivityData([]);
   };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!currentUserId) {
@@ -264,7 +316,7 @@ const KanbanBoard = () => {
       setShowForm(false);
       setRenderKey(prev => prev + 1);
     } catch (err) {
-      setError(err.response?.data?.message || err.message);
+      setError(handleApiError(err));
     }
   };
 
@@ -280,7 +332,7 @@ const KanbanBoard = () => {
       setTasks(prevTasks => prevTasks.filter(task => task._id !== taskId));
       setRenderKey(prev => prev + 1);
     } catch (err) {
-      setError(err.response?.data?.message || err.message);
+      setError(handleApiError(err));
     }
   };
 
@@ -327,9 +379,15 @@ const KanbanBoard = () => {
               <div className="col-12">
                 <h4 className="main-title">
                   Board {projectName ? `for project "${projectName}"` : ''}
-                  <button className="btn btn-primary ms-3" onClick={() => { setShowForm(true); setEditTask(null); }}>
-                    <i className="ti ti-plus"></i> Add Task
-                  </button>
+                  {['Admin', 'Project Manager', 'Team Leader'].includes(userRole) && (
+                    <button
+                      className="btn btn-primary ms-3"
+                      onClick={() => { setShowForm(true); setEditTask(null); }}
+                      disabled={teamMembers.length === 0}
+                    >
+                      <i className="ti ti-plus"></i> Add Task
+                    </button>
+                  )}
                   <button
                     className="btn btn-success ms-3"
                     onClick={handleGenerateChart}
@@ -341,6 +399,12 @@ const KanbanBoard = () => {
                 <ul className="app-line-breadcrumbs mb-3">
                   <li className="active"><a className="f-s-14 f-w-500" href="#">Projects</a></li>
                 </ul>
+                {teamMembers.length === 0 && (
+                  <div className="custom-alert custom-alert-danger mt-2">
+                    <i className="ph-duotone ph-warning-circle me-2"></i>
+                    No team members assigned to this project. Please assign members in the project settings.
+                  </div>
+                )}
                 {error && <div className="alert alert-danger">{error}</div>}
               </div>
             </div>
@@ -432,32 +496,47 @@ const KanbanBoard = () => {
                             value={editTask ? editTask.dueDate : newTask.dueDate}
                             onChange={handleInputChange}
                           />
-                          {/* Ajout du bouton juste après le champ existant */}
                           <button
                             type="button"
                             className="btn btn-info mt-2"
                             onClick={predictTaskDuration}
                           >
-                           Suggest a duration with AI
+                            Suggest a duration with AI
                           </button>
                         </div>
-                        <div className="mb-3">
-                          <label className="form-label">Assigned To</label>
-                          <select
-                            className="form-control"
-                            name="assignedTo"
-                            multiple
-                            value={editTask ? (editTask.assignedTo || []) : newTask.assignedTo}
-                            onChange={handleAssignedToChange}
-                            style={{ height: '100px' }}
-                          >
-                            {users.map(user => (
-                              <option key={user._id} value={user._id}>
-                                {user.firstname} {user.lastname}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
+                        {['Admin', 'Project Manager', 'Team Leader'].includes(userRole) && (
+                          <div className="mb-3">
+                            <label className="form-label">Assigned To</label>
+                            <select
+                              className="form-control"
+                              name="assignedTo"
+                              multiple
+                              value={editTask ? (editTask.assignedTo || []) : newTask.assignedTo}
+                              onChange={handleAssignedToChange}
+                              style={{ height: '100px' }}
+                            >
+                              {teamMembers.length > 0 ? (
+                                (() => {
+                                  const filteredUsers = users.filter(user => {
+                                    if (!user._id) return false;
+                                    const userId = user._id.toString();
+                                    return teamMembers.includes(userId);
+                                  });
+                                  if (filteredUsers.length === 0) {
+                                    return <option disabled>No matching team members found</option>;
+                                  }
+                                  return filteredUsers.map(user => (
+                                    <option key={user._id} value={user._id}>
+                                      {user.firstname} {user.lastname} ({user.role?.name || "Rôle non défini"})
+                                    </option>
+                                  ));
+                                })()
+                              ) : (
+                                <option disabled>No team members assigned to this project</option>
+                              )}
+                            </select>
+                          </div>
+                        )}
                       </div>
                       <div className="modal-footer">
                         <button type="button" className="btn btn-secondary" onClick={() => setShowForm(false)}>
@@ -515,9 +594,7 @@ const KanbanBoard = () => {
                                         >
                                           <i className="ti ti-trash"></i>
                                         </button>
-
                                       </div>
-
                                     </div>
                                   </div>
                                 </div>
@@ -534,19 +611,16 @@ const KanbanBoard = () => {
               </div>
             </div>
 
-            {/* Remove the chart section here, as it will be in the modal */}
-
             {productivityLoading && <div className="loader-wrapper"><div className="loader_16"></div></div>}
             {productivityError && <div className="alert alert-danger mt-3">{productivityError}</div>}
 
-            {/* Modal to display the productivity chart */}
             <Modal
               show={showProductivityModal}
               onHide={handleCloseModal}
-              centered // Center the modal vertically
-              size="md" // Medium size for a small window
-              backdrop="static" // Prevent closing by clicking outside
-              keyboard={false} // Prevent closing with the Escape key
+              centered
+              size="md"
+              backdrop="static"
+              keyboard={false}
             >
               <Modal.Header closeButton>
                 <Modal.Title>Productivity of Project "{projectName}"</Modal.Title>
@@ -562,7 +636,7 @@ const KanbanBoard = () => {
                             <XAxis
                               dataKey="project"
                               type="category"
-                              hide={true} // Hide the X-axis for a generic chart
+                              hide={true}
                               allowDuplicatedCategory={false}
                             />
                             <YAxis
@@ -578,7 +652,7 @@ const KanbanBoard = () => {
                             />
                             <Bar
                               dataKey="totalTasksCompleted"
-                              fill="#4CAF50" // Green for completed tasks
+                              fill="#4CAF50"
                               name="Completed Tasks"
                               animationBegin={300}
                               animationDuration={1500}
@@ -586,7 +660,7 @@ const KanbanBoard = () => {
                             />
                             <Bar
                               dataKey="score"
-                              fill="#2196F3" // Blue for productivity score
+                              fill="#2196F3"
                               name="Productivity Score"
                               animationBegin={300}
                               animationDuration={1500}

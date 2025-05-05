@@ -4,6 +4,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import '../../assets/vendor/glightbox/glightbox.min.css';
 import '../../assets/vendor/apexcharts/apexcharts.css';
 import '../../assets/vendor/select/select2.min.css';
+import { useNavigate } from 'react-router-dom';
 import Header from "../Layout/Header";
 import SideBar from "../Layout/Sidebar";
 import UserProfileForm from "../Pages/UserProfileForm";
@@ -12,28 +13,40 @@ const Profile = ({ userId }) => {
   const [activeTab, setActiveTab] = useState('profile-tab-pane');
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState("");
-  const [userData, setUserData] = useState(null); // Nouvel état pour stocker les données utilisateur
+  const [cv, setCv] = useState(null);
+  const [cvPreview, setCvPreview] = useState("");
+  const [userData, setUserData] = useState(null);
+  const [notification, setNotification] = useState({ message: "", type: "" });
+  const [isTwoFactorEnabled, setIsTwoFactorEnabled] = useState(false);
+  const [loading2FA, setLoading2FA] = useState(false);
+  const [error2FA, setError2FA] = useState(null);
+  const navigate = useNavigate();
+
+  const fetchUserProfile = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      console.error("Token missing");
+      setNotification({ message: "You must be logged in.", type: "error" });
+      return;
+    }
+
+    try {
+      const response = await axios.get("http://localhost:4000/api/profile", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setPreview(response.data.profileImage);
+      setCvPreview(response.data.cv || "");
+      setUserData(response.data);
+      setIsTwoFactorEnabled(response.data.isTwoFactorEnabled || false);
+      console.log("User data from API in Profile:", response.data);
+      console.log("Current skills:", response.data.skills);
+    } catch (error) {
+      console.error("Error fetching user data:", error);
+      setNotification({ message: "Failed to fetch user data.", type: "error" });
+    }
+  };
 
   useEffect(() => {
-    const fetchUserProfile = async () => {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        console.error("Token manquant");
-        return;
-      }
-
-      try {
-        const response = await axios.get("http://localhost:4000/api/profile", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setPreview(response.data.profileImage);
-        setUserData(response.data); // Stocker toutes les données utilisateur
-        console.log("User data from API in Profile:", response.data); // Débogage
-      } catch (error) {
-        console.error("Erreur lors du chargement des données utilisateur :", error);
-      }
-    };
-
     fetchUserProfile();
   }, []);
 
@@ -42,16 +55,21 @@ const Profile = ({ userId }) => {
     setPreview(URL.createObjectURL(e.target.files[0]));
   };
 
+  const handleCvChange = (e) => {
+    setCv(e.target.files[0]);
+    setCvPreview(e.target.files[0].name);
+  };
+
   const handleUpload = async () => {
     if (!image) {
-      alert("Veuillez sélectionner une image.");
+      setNotification({ message: "Please select an image.", type: "error" });
       return;
     }
 
     const token = localStorage.getItem("token");
     if (!token) {
-      console.error("Token manquant");
-      alert("Vous devez être connecté.");
+      console.error("Token missing");
+      setNotification({ message: "You must be logged in.", type: "error" });
       return;
     }
 
@@ -66,13 +84,95 @@ const Profile = ({ userId }) => {
         },
       });
 
-      if (response.data.imageUrl) {
-        setPreview(response.data.imageUrl);
-        alert("Image updated successfully !");
+      setPreview(response.data.imageUrl);
+      setNotification({ message: "Image uploaded successfully!", type: "success" });
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      setNotification({ message: "Failed to upload image.", type: "error" });
+    }
+  };
+
+  const handleCvUpload = async () => {
+    if (!cv) {
+      setNotification({ message: "Please select a CV.", type: "error" });
+      return;
+    }
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      console.error("Token missing");
+      setNotification({ message: "You must be logged in.", type: "error" });
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("cv", cv);
+
+    try {
+      const response = await axios.post("http://localhost:4000/api/profile/upload-cv", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      console.log("Backend response after CV upload:", response.data);
+      setCvPreview(response.data.cvUrl);
+      setNotification({ message: response.data.message, type: "success" });
+      await fetchUserProfile();
+    } catch (error) {
+      console.error("Error uploading CV:", error);
+      setNotification({ message: "Failed to upload CV.", type: "error" });
+    }
+  };
+
+  const handleToggle2FA = async () => {
+    const token = localStorage.getItem("token");
+    if (!token || !userData?.email) {
+      setNotification({ message: "You must be logged in with a valid email.", type: "error" });
+      return;
+    }
+
+    setLoading2FA(true);
+    setError2FA(null);
+
+    try {
+      if (!isTwoFactorEnabled) {
+        // Enable 2FA: Generate QR code
+        const response = await axios.post(
+          "http://localhost:4000/api/auth/generate-2fa",
+          { email: userData.email },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        if (response.data.qrCode) {
+          // Store QR code and email, then navigate to verification page
+          localStorage.setItem("qrCode", response.data.qrCode);
+          localStorage.setItem("email", userData.email);
+          navigate("/verify-2fa");
+        } else {
+          throw new Error("Failed to generate QR code.");
+        }
+      } else {
+        // Disable 2FA
+        const response = await axios.post(
+          "http://localhost:4000/api/auth/disable-2fa",
+          { email: userData.email },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        if (response.data.message) {
+          setIsTwoFactorEnabled(false);
+          setUserData({ ...userData, isTwoFactorEnabled: false });
+          setNotification({ message: "2FA disabled successfully!", type: "success" });
+          await fetchUserProfile(); // Refresh user data
+        }
       }
     } catch (error) {
-      console.error("Erreur lors de l'upload :", error);
-      alert("Échec du téléchargement de l'image.");
+      console.error("Error managing 2FA:", error);
+      setError2FA(error.response?.data?.message || "Error managing 2FA.");
+    } finally {
+      setLoading2FA(false);
     }
   };
 
@@ -125,46 +225,41 @@ const Profile = ({ userId }) => {
                           <i className="ph-bold ph-shield-check pe-2"></i> Security
                         </button>
                       </li>
-                      <li className="nav-item">
-                        <button
-                          className={`nav-link ${activeTab === 'notification-tab-pane' ? 'active' : ''}`}
-                          onClick={() => handleTabChange('notification-tab-pane')}
-                        >
-                          <i className="ph-bold ph-notification pe-2"></i> Notification
-                        </button>
-                      </li>
-                      <li className="nav-item">
-                        <button className="nav-link">
-                          <i className="ph-bold ph-trash pe-2"></i> Delete
-                        </button>
-                      </li>
+                    
                     </ul>
                   </div>
                 </div>
+                
                 <div className="card">
                   <div className="card-header">
                     <h5>Skills</h5>
                   </div>
                   <div className="card-body">
-                    <div className="mb-4">
-                      <h6 className="mb-1 text-dark">Skill 1</h6>
-                      <div>
-                        <div className="d-flex justify-content-between">
-                          <p className="text-secondary">Photos 01</p>
-                          <span className="text-primary">65%</span>
+                    {userData && userData.skills && userData.skills.length > 0 ? (
+                      userData.skills.map((skill, index) => (
+                        <div key={index} className="mb-4">
+                          <h6 className="mb-1 text-dark">{skill}</h6>
+                          <div>
+                            <div className="d-flex justify-content-between">
+                              <p className="text-secondary">Skill</p>
+                              <span className="text-primary">100%</span>
+                            </div>
+                            <div className="progress h-5">
+                              <div
+                                className="progress-bar bg-primary h-5"
+                                role="progressbar"
+                                style={{ width: '100%' }}
+                                aria-valuenow="100"
+                                aria-valuemin="0"
+                                aria-valuemax="100"
+                              ></div>
+                            </div>
+                          </div>
                         </div>
-                        <div className="progress h-5">
-                          <div
-                            className="progress-bar bg-primary h-5"
-                            role="progressbar"
-                            style={{ width: '65%' }}
-                            aria-valuenow="65"
-                            aria-valuemin="0"
-                            aria-valuemax="100"
-                          ></div>
-                        </div>
-                      </div>
-                    </div>
+                      ))
+                    ) : (
+                      <p>No skills recorded.</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -205,13 +300,60 @@ const Profile = ({ userId }) => {
                                 </div>
                                 <div className="text-center">
                                   <button onClick={handleUpload} className="btn btn-primary mt-4">
-                                    Upload
+                                    Upload Image
                                   </button>
                                 </div>
                               </div>
                             </div>
 
-                            <UserProfileForm />
+                            {/* Section Upload CV */}
+                            <div className="cv-upload mt-4">
+                              <h6>Upload CV</h6>
+                              <div className="avatar-upload" style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                                <div className="avatar-edit" style={{ position: "relative", marginBottom: "10px" }}>
+                                  <input
+                                    type="file"
+                                    id="cvUpload"
+                                    accept=".pdf,.docx"
+                                    onChange={handleCvChange}
+                                    style={{ display: "none" }}
+                                  />
+                                  <label
+                                    htmlFor="cvUpload"
+                                    style={{
+                                      cursor: "pointer",
+                                      padding: "10px 20px",
+                                      backgroundColor: "#f0f0f0",
+                                      borderRadius: "5px",
+                                      border: "1px solid #ddd",
+                                      display: "inline-block",
+                                      letterSpacing: "normal",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    <i className="ti ti-file-upload me-2"></i>Choose a CV
+                                  </label>
+                                </div>
+                                <div className="text-center">
+                                  <button onClick={handleCvUpload} className="btn btn-primary mt-2">
+                                    Upload CV
+                                  </button>
+                                </div>
+                              </div>
+                              {notification.message && (
+                                <div
+                                  className={`alert alert-${notification.type === "success" ? "success" : "danger"} mt-3`}
+                                  role="alert"
+                                >
+                                  {notification.message}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Section User Info */}
+                            <div className="user-info-section mt-4">
+                              <UserProfileForm />
+                            </div>
 
                             {/* Tableau des Projets Gérés */}
                             <div className="col-xl-12">
@@ -280,7 +422,7 @@ const Profile = ({ userId }) => {
                                                 </span>
                                               </td>
                                               <td>{task.priority}</td>
-                                              <td>{task.project?.name || "Non spécifié"}</td>
+                                              <td>{task.project?.name || "Not specified"}</td>
                                             </tr>
                                           ))
                                         ) : (
@@ -300,15 +442,51 @@ const Profile = ({ userId }) => {
                     </div>
                   )}
 
-                  {/* Autres onglets inchangés */}
                   {activeTab === 'security-tab-pane' && (
                     <div className="tab-pane fade show active" id="security-tab-pane">
-                      {/* Contenu existant */}
+                      <div className="card">
+                        <div className="card-header">
+                          <h5>Security Settings</h5>
+                        </div>
+                        <div className="card-body">
+                          <div className="mb-3">
+                            <label className="form-label">Two-Factor Authentication (2FA)</label>
+                            <div className="form-check form-switch">
+                              <input
+                                className="form-check-input"
+                                type="checkbox"
+                                id="twoFactorSwitch"
+                                checked={isTwoFactorEnabled}
+                                onChange={handleToggle2FA}
+                                disabled={loading2FA}
+                              />
+                              <label className="form-check-label" htmlFor="twoFactorSwitch">
+                                {isTwoFactorEnabled ? 'Enabled' : 'Disabled'}
+                              </label>
+                            </div>
+                            {loading2FA && <p>Loading...</p>}
+                            {error2FA && <div className="alert alert-danger mt-2">{error2FA}</div>}
+                            <p className="text-muted mt-2">
+                              {isTwoFactorEnabled
+                                ? 'Two-Factor Authentication is enabled. You will need to enter a code from your authenticator app when signing in.'
+                                : 'Enable Two-Factor Authentication to add an extra layer of security to your account.'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
+
                   {activeTab === 'notification-tab-pane' && (
                     <div className="tab-pane fade show active" id="notification-tab-pane">
-                      {/* Contenu existant */}
+                      <div className="card">
+                        <div className="card-header">
+                          <h5>Notification Settings</h5>
+                        </div>
+                        <div className="card-body">
+                          <p>Configure your notification preferences here.</p>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>

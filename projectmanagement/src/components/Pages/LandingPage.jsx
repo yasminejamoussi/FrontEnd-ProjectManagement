@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Navbar as BSNavbar, Nav, Button, Tab, Tabs } from 'react-bootstrap';
 import Typed from 'typed.js';
 import AOS from 'aos';
+import { Link } from 'react-router-dom';
 
 // Importation de toutes les images
 import LogoBlanc from '../../assets/images/logo/LogoBlanc.png';
@@ -29,9 +30,19 @@ import AnimatedImg from '../../assets/images/landing/animated.jpg';
 import WeatherImg from '../../assets/images/landing/weather.jpg';
 import DarkLayout from '../../assets/images/landing/dark-layout.png';
 import DarkLayout1 from '../../assets/images/landing/dark-layout-1.png';
-import { Link } from "react-router-dom";
+
+// Fallback image
+const fallbackImage = 'https://via.placeholder.com/150?text=Image+Not+Found';
 
 function LandingPage() {
+  const [isSpeaking, setIsSpeaking] = useState({});
+
+  // Define handleImageError
+  const handleImageError = useCallback((e) => {
+    console.warn('Image failed to load:', e.target.src);
+    e.target.src = fallbackImage; // Set fallback image
+  }, []);
+
   useEffect(() => {
     AOS.init({ duration: 1000 });
     const typed = new Typed('#highlight-typed', {
@@ -41,8 +52,39 @@ function LandingPage() {
       loop: true,
     });
     return () => typed.destroy();
-    
   }, []);
+
+  const speakText = (text, section) => {
+    if ('speechSynthesis' in window) {
+      if (isSpeaking[section]) {
+        window.speechSynthesis.cancel();
+        setIsSpeaking({ ...isSpeaking, [section]: false });
+      } else {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'en-GB'; // Changé pour l'anglais britannique
+  
+        // Obtenir les voix disponibles
+        const voices = window.speechSynthesis.getVoices();
+        // Sélectionner une voix en-GB
+        const enGBVoice = voices.find(
+          (voice) => voice.lang === 'en-GB' || voice.lang === 'en_GB'
+        );
+  
+        if (enGBVoice) {
+          utterance.voice = enGBVoice;
+        } else {
+          console.warn('Aucune voix en-GB disponible, utilisation de la voix par défaut.');
+        }
+  
+        utterance.onend = () => setIsSpeaking({ ...isSpeaking, [section]: false });
+        utterance.onerror = (e) => console.error('Erreur SpeechSynthesis :', e);
+        window.speechSynthesis.speak(utterance);
+        setIsSpeaking({ ...isSpeaking, [section]: true });
+      }
+    } else {
+      console.warn('La synthèse vocale n\'est pas supportée dans ce navigateur.');
+    }
+  };
 
   return (
     <div className="bg-white landing-page">
@@ -52,10 +94,10 @@ function LandingPage() {
 
         <div className="landing-wrapper">
           {/* Navbar */}
-          <BSNavbar expand="lg" className="sticky-top landing-nav_main px-3 position-fixed w-100" style={{ backgroundColor: "#202335" }}>
+          <BSNavbar expand="lg" className="sticky-top landing-nav_main px-3 position-fixed w-100" style={{ backgroundColor: '#202335' }}>
             <div className="container-fluid">
               <BSNavbar.Brand href="index.php">
-                <img alt="logo" src={LogoBlanc} width="150" />
+                <img alt="logo" src={LogoBlanc} width="150" onError={handleImageError} />
               </BSNavbar.Brand>
               <BSNavbar.Toggle aria-controls="landing_nav" />
               <BSNavbar.Collapse id="landing_nav">
@@ -66,13 +108,15 @@ function LandingPage() {
                   <Nav.Link href="mailto:Contact@orkestra.tn" target="_blank">Contact</Nav.Link>
                 </Nav>
                 <Link to="/signin">
-                <Button variant="danger" className="rounded" >
-                  Sign In
-                </Button></Link>
+                  <Button variant="danger" className="rounded">
+                    Sign In
+                  </Button>
+                </Link>
                 <Link to="/signup">
-                <Button variant="primary" className="ms-2 rounded">
-                  Sign Up
-                </Button></Link>
+                  <Button variant="primary" className="ms-2 rounded">
+                    Sign Up
+                  </Button>
+                </Link>
               </BSNavbar.Collapse>
             </div>
           </BSNavbar>
@@ -82,17 +126,38 @@ function LandingPage() {
             <div className="container-fluid">
               <div className="row landing-content">
                 <div className="col-lg-6 offset-lg-3 position-relative">
-                  <div className="landing-heading text-center">
+                  <div className="landing-heading text-center" style={{ position: 'relative' }}>
+                    <i
+                      className={`fas ${isSpeaking.hero ? 'fa-pause' : 'fa-volume-up'}`}
+                      style={{
+                        position: 'absolute',
+                        top: '10px',
+                        right: '10px',
+                        fontSize: '1rem',
+                        color: '#666',
+                        opacity: 0.7,
+                        cursor: 'pointer',
+                      }}
+                      onClick={() =>
+                        speakText(
+                          'Power Up Your Workflow With Orkestra. Orkestra is the best AI based project management platform!',
+                          'hero'
+                        )
+                      }
+                      onMouseEnter={(e) => (e.target.style.opacity = 1)}
+                      onMouseLeave={(e) => (e.target.style.opacity = 0.7)}
+                    ></i>
                     <h1>
-                      Power Up Your <br /> <span id="highlight-typed"></span> With Orkestra <br/>
+                      Power Up Your <br /> <span id="highlight-typed"></span> With Orkestra <br />
                     </h1>
                     <img
                       alt="shape"
                       className="img-fluid landing-vector-shape"
                       src={VectorShaps}
+                      onError={handleImageError}
                     />
                     <p>Orkestra is the best AI based <br />project management platform!</p>
-                    <div className="mg-t-60">
+                    <div className="mg-t-20">
                       <a
                         className="btn btn-danger py-3 px-4 b-r-50 btn-lg ms-2"
                         href="https://phpstack-1384472-5121645.cloudwaysapps.com/document/php/Orkestra/index.html"
@@ -108,10 +173,10 @@ function LandingPage() {
                   <div className="landing-img">
                     <div className="img-box">
                       <div>
-                        <img alt="img" className="box-img-1" src={BannerImg} />
+                        <img alt="img" className="box-img-1" src={BannerImg} onError={handleImageError} />
                       </div>
                       <div>
-                        <img alt="img" className="box-img-4" src={BannerImg1} />
+                        <img alt="img" className="box-img-4" src={BannerImg1} onError={handleImageError} />
                       </div>
                     </div>
                   </div>
@@ -122,7 +187,27 @@ function LandingPage() {
         </div>
 
         {/* About Us Section */}
-        <section className="card-section" id="AboutUs">
+        <section className="card-section" id="AboutUs" style={{ position: 'relative' }}>
+          <i
+            className={`fas ${isSpeaking.about ? 'fa-pause' : 'fa-volume-up'}`}
+            style={{
+              position: 'absolute',
+              top: '10px',
+              right: '10px',
+              fontSize: '1rem',
+              color: '#666',
+              opacity: 0.7,
+              cursor: 'pointer',
+            }}
+            onClick={() =>
+              speakText(
+                'About Us. At Orkestra, we harness the power of artificial intelligence to make project management smarter, more efficient, and seamlessly accessible to everyone. Our mission is to help engineers, project managers, and teams organize, track, and successfully complete their projects without getting lost in complex processes. AI-based task prioritization, AI-based project delay prediction, Predictive Analytics for Task Completion, Task assignment recommendation.',
+                'about'
+              )
+            }
+            onMouseEnter={(e) => (e.target.style.opacity = 1)}
+            onMouseLeave={(e) => (e.target.style.opacity = 0.7)}
+          ></i>
           <div className="container">
             <div className="row">
               <div className="col-lg-7">
@@ -146,15 +231,55 @@ function LandingPage() {
                   <li>Task assignment recommendation</li>
                 </ul>
               </div>
-              <div className="col-lg-5 col-sm-6 d-flex align-items-center justify-content-center">
-                <img src={LogoNoir} alt="Logo Orkestra" width="400" />
+              <div className="col-lg-5 col-sm-6 d-flex align-items-center justify-content-center" style={{ position: 'relative' }}>
+                <img src={LogoNoir} alt="Logo Orkestra" width="400" onError={handleImageError} />
+                <i
+                  className={`fas ${isSpeaking.logo ? 'fa-pause' : 'fa-volume-up'}`}
+                  style={{
+                    position: 'absolute',
+                    top: '30px',
+                    right: '10px',
+                    fontSize: '1rem',
+                    color: '#666',
+                    opacity: 0.7,
+                    cursor: 'pointer',
+                  }}
+                  onClick={() =>
+                    speakText(
+                      'The logo features a stylized hand holding a conductor’s baton in purple, next to the word “ORKESTRA” in bold, uppercase black letters. It conveys themes of coordination, leadership, and harmony.',
+                      'logo'
+                    )
+                  }
+                  onMouseEnter={(e) => (e.target.style.opacity = 1)}
+                  onMouseLeave={(e) => (e.target.style.opacity = 0.7)}
+                ></i>
               </div>
             </div>
           </div>
         </section>
 
         {/* Features Section */}
-        <section id="services" className="dark-section py-5">
+        <section id="services" className="dark-section py-5" style={{ position: 'relative' }}>
+          <i
+            className={`fas ${isSpeaking.features ? 'fa-pause' : 'fa-volume-up'}`}
+            style={{
+              position: 'absolute',
+              top: '10px',
+              right: '10px',
+              fontSize: '1rem',
+              color: '#fff',
+              opacity: 0.7,
+              cursor: 'pointer',
+            }}
+            onClick={() =>
+              speakText(
+                'Our Features. Empowering you with the best tools for project success. User Authentication: Secure login and role-based access ensure that only authorized users can view or modify project details. Project Management: Easily create, track, and manage projects, keeping everything on schedule with real-time updates. Task Management: Create, assign, and prioritize tasks efficiently to boost productivity and meet deadlines. Dashboard & Smart Notifications: Get a clear project overview with a customizable dashboard and stay informed with smart alerts. Activity Log & History: Track all project activities, decisions, and updates for transparency and accountability.',
+                'features'
+              )
+            }
+            onMouseEnter={(e) => (e.target.style.opacity = 1)}
+            onMouseLeave={(e) => (e.target.style.opacity = 0.7)}
+          ></i>
           <div className="container">
             <h1 className="text-center mb-2" style={{ color: '#f00ac8' }}>Our Features</h1>
             <p className="text-center text-light mb-4">Empowering you with the best tools for project success.</p>
@@ -199,7 +324,27 @@ function LandingPage() {
         </section>
 
         {/* Demo Section */}
-        <section className="demos-section" id="Demo" style={{ backgroundColor: 'rgb(252, 247, 247)' }}>
+        <section className="demos-section" id="Demo" style={{ backgroundColor: 'rgb(252, 247, 247)', position: 'relative' }}>
+          <i
+            className={`fas ${isSpeaking.demo ? 'fa-pause' : 'fa-volume-up'}`}
+            style={{
+              position: 'absolute',
+              top: '10px',
+              right: '10px',
+              fontSize: '1rem',
+              color: '#666',
+              opacity: 0.7,
+              cursor: 'pointer',
+            }}
+            onClick={() =>
+              speakText(
+                'Orkestra revolutionizes project management. Take a glimpse at our platform through a showcase of key features designed specifically to optimize your workflow.',
+                'demo'
+              )
+            }
+            onMouseEnter={(e) => (e.target.style.opacity = 1)}
+            onMouseLeave={(e) => (e.target.style.opacity = 0.7)}
+          ></i>
           <div className="container-fluid">
             <div className="row">
               <div className="col-xl-6 offset-xl-3">
@@ -221,7 +366,7 @@ function LandingPage() {
                           <div className="col-sm-6 col-lg-3">
                             <div className="card demo-card">
                               <div className="card-body">
-                                <img alt="demo-img" className="img-fluid b-r-8" src={ProjectDashboard} />
+                                <img alt="demo-img" className="img-fluid b-r-8" src={ProjectDashboard} onError={handleImageError} />
                                 <div className="demo-box">
                                   <h6 className="m-0 f-w-500 f-s-18">Project</h6>
                                   <a className="btn btn-light-success icon-btn b-r-22" href="index.php" target="_blank" role="button">
@@ -234,7 +379,7 @@ function LandingPage() {
                           <div className="col-sm-6 col-lg-3">
                             <div className="card demo-card">
                               <div className="card-body">
-                                <img alt="demo-img" className="img-fluid b-r-8" src={EcommerceDashboard} />
+                                <img alt="demo-img" className="img-fluid b-r-8" src={EcommerceDashboard} onError={handleImageError} />
                                 <div className="demo-box">
                                   <h6 className="m-0 f-w-500 f-s-18">Dashboard</h6>
                                   <a className="btn btn-light-primary icon-btn b-r-22" href="ecommerce_dashboard.php" target="_blank" role="button">
@@ -252,7 +397,7 @@ function LandingPage() {
                         <div className="col-sm-6 col-lg-3">
                           <div className="card demo-card">
                             <div className="card-body">
-                              <img alt="demo-img" className="img-fluid b-r-8" src={EmailImg} />
+                              <img alt="demo-img" className="img-fluid b-r-8" src={EmailImg} onError={handleImageError} />
                               <div className="demo-box">
                                 <h6 className="m-0 f-w-500 f-s-18">Email</h6>
                                 <a className="btn btn-light-danger icon-btn b-r-22" href="email.php" target="_blank" role="button">
@@ -265,7 +410,7 @@ function LandingPage() {
                         <div className="col-sm-6 col-lg-3">
                           <div className="card demo-card">
                             <div className="card-body">
-                              <img alt="demo-img" className="img-fluid b-r-8" src={TodoImg} />
+                              <img alt="demo-img" className="img-fluid b-r-8" src={TodoImg} onError={handleImageError} />
                               <div className="demo-box">
                                 <h6 className="m-0 f-w-500 f-s-18">Todo</h6>
                                 <a className="btn btn-light-success icon-btn b-r-22" href="to_do.php" target="_blank" role="button">
@@ -278,7 +423,7 @@ function LandingPage() {
                         <div className="col-sm-6 col-lg-3">
                           <div className="card demo-card">
                             <div className="card-body">
-                              <img alt="demo-img" className="img-fluid b-r-8" src={FileManagerImg} />
+                              <img alt="demo-img" className="img-fluid b-r-8" src={FileManagerImg} onError={handleImageError} />
                               <div className="demo-box">
                                 <h6 className="m-0 f-w-500 f-s-18">File manager</h6>
                                 <a className="btn btn-light-primary icon-btn b-r-22" href="filemanager.php" target="_blank" role="button">
@@ -291,7 +436,7 @@ function LandingPage() {
                         <div className="col-sm-6 col-lg-3">
                           <div className="card demo-card">
                             <div className="card-body">
-                              <img alt="demo-img" className="img-fluid b-r-8" src={BlogImg} />
+                              <img alt="demo-img" className="img-fluid b-r-8" src={BlogImg} onError={handleImageError} />
                               <div className="demo-box">
                                 <h6 className="m-0 f-w-500 f-s-18">Blog</h6>
                                 <a className="btn btn-light-primary icon-btn b-r-22" href="blog.php" target="_blank" role="button">
@@ -308,7 +453,7 @@ function LandingPage() {
                         <div className="col-sm-6 col-lg-3">
                           <div className="card demo-card">
                             <div className="card-body">
-                              <img alt="demo-img" className="img-fluid b-r-8" src={AvtarImg} />
+                              <img alt="demo-img" className="img-fluid b-r-8" src={AvtarImg} onError={handleImageError} />
                               <div className="demo-box">
                                 <h6 className="m-0 f-w-500 f-s-18">Avatar</h6>
                                 <a className="btn btn-light-danger icon-btn b-r-22" href="avtar.php" target="_blank" role="button">
@@ -321,7 +466,7 @@ function LandingPage() {
                         <div className="col-sm-6 col-lg-3">
                           <div className="card demo-card">
                             <div className="card-body">
-                              <img alt="demo-img" className="img-fluid b-r-8" src={AccordionsImg} />
+                              <img alt="demo-img" className="img-fluid b-r-8" src={AccordionsImg} onError={handleImageError} />
                               <div className="demo-box">
                                 <h6 className="m-0 f-w-500 f-s-18">Accordions</h6>
                                 <a className="btn btn-light-warning icon-btn b-r-22" href="accordions.php" target="_blank" role="button">
@@ -334,7 +479,7 @@ function LandingPage() {
                         <div className="col-sm-6 col-lg-3">
                           <div className="card demo-card">
                             <div className="card-body">
-                              <img alt="demo-img" className="img-fluid b-r-8" src={ProgressImg} />
+                              <img alt="demo-img" className="img-fluid b-r-8" src={ProgressImg} onError={handleImageError} />
                               <div className="demo-box">
                                 <h6 className="m-0 f-w-500 f-s-18">Progress</h6>
                                 <a className="btn btn-light-success icon-btn b-r-22" href="progress.php" target="_blank" role="button">
@@ -347,7 +492,7 @@ function LandingPage() {
                         <div className="col-sm-6 col-lg-3">
                           <div className="card demo-card">
                             <div className="card-body">
-                              <img alt="demo-img" className="img-fluid b-r-8" src={NotificationImg} />
+                              <img alt="demo-img" className="img-fluid b-r-8" src={NotificationImg} onError={handleImageError} />
                               <div className="demo-box">
                                 <h6 className="m-0 f-w-500 f-s-18">Notifications</h6>
                                 <a className="btn btn-light-primary icon-btn b-r-22" href="notifications.php" target="_blank" role="button">
@@ -364,7 +509,7 @@ function LandingPage() {
                         <div className="col-sm-6 col-lg-3">
                           <div className="card demo-card">
                             <div className="card-body">
-                              <img alt="demo-img" className="img-fluid b-r-8" src={TourImg} />
+                              <img alt="demo-img" className="img-fluid b-r-8" src={TourImg} onError={handleImageError} />
                               <div className="demo-box">
                                 <h6 className="m-0 f-w-500 f-s-18">Tour</h6>
                                 <a className="btn btn-light-danger icon-btn b-r-22" href="tour.php" target="_blank" role="button">
@@ -377,7 +522,7 @@ function LandingPage() {
                         <div className="col-sm-6 col-lg-3">
                           <div className="card demo-card">
                             <div className="card-body">
-                              <img alt="demo-img" className="img-fluid b-r-8" src={SliderImg} />
+                              <img alt="demo-img" className="img-fluid b-r-8" src={SliderImg} onError={handleImageError} />
                               <div className="demo-box">
                                 <h6 className="m-0 f-w-500 f-s-18">Slider</h6>
                                 <a className="btn btn-light-warning icon-btn b-r-22" href="slick.php" target="_blank" role="button">
@@ -390,7 +535,7 @@ function LandingPage() {
                         <div className="col-sm-6 col-lg-3">
                           <div className="card demo-card">
                             <div className="card-body">
-                              <img alt="demo-img" className="img-fluid b-r-8" src={RatingImg} />
+                              <img alt="demo-img" className="img-fluid b-r-8" src={RatingImg} onError={handleImageError} />
                               <div className="demo-box">
                                 <h6 className="m-0 f-w-500 f-s-18">Rating</h6>
                                 <a className="btn btn-light-success icon-btn b-r-22" href="ratings.php" target="_blank" role="button">
@@ -403,7 +548,7 @@ function LandingPage() {
                         <div className="col-sm-6 col-lg-3">
                           <div className="card demo-card">
                             <div className="card-body">
-                              <img alt="demo-img" className="img-fluid b-r-8" src={CountDownImg} />
+                              <img alt="demo-img" className="img-fluid b-r-8" src={CountDownImg} onError={handleImageError} />
                               <div className="demo-box">
                                 <h6 className="m-0 f-w-500 f-s-18">Count Down</h6>
                                 <a className="btn btn-light-primary icon-btn b-r-22" href="count_down.php" target="_blank" role="button">
@@ -420,7 +565,7 @@ function LandingPage() {
                         <div className="col-sm-6 col-lg-3">
                           <div className="card demo-card">
                             <div className="card-body">
-                              <img alt="demo-img" className="img-fluid b-r-8" src={FontAwesomeImg} />
+                              <img alt="demo-img" className="img-fluid b-r-8" src={FontAwesomeImg} onError={handleImageError} />
                               <div className="demo-box">
                                 <h6 className="m-0 f-w-500 f-s-18">Fontawesome Icons</h6>
                                 <a className="btn btn-light-primary icon-btn b-r-22" href="fontawesome.php" target="_blank" role="button">
@@ -433,7 +578,7 @@ function LandingPage() {
                         <div className="col-sm-6 col-lg-3">
                           <div className="card demo-card">
                             <div className="card-body">
-                              <img alt="demo-img" className="img-fluid b-r-8" src={FlagImg} />
+                              <img alt="demo-img" className="img-fluid b-r-8" src={FlagImg} onError={handleImageError} />
                               <div className="demo-box">
                                 <h6 className="m-0 f-w-500 f-s-18">Flag Icons</h6>
                                 <a className="btn btn-light-primary icon-btn b-r-22" href="flag_icons.php" target="_blank" role="button">
@@ -446,7 +591,7 @@ function LandingPage() {
                         <div className="col-sm-6 col-lg-3">
                           <div className="card demo-card">
                             <div className="card-body">
-                              <img alt="demo-img" className="img-fluid b-r-8" src={AnimatedImg} />
+                              <img alt="demo-img" className="img-fluid b-r-8" src={AnimatedImg} onError={handleImageError} />
                               <div className="demo-box">
                                 <h6 className="m-0 f-w-500 f-s-18">Animated Icons</h6>
                                 <a className="btn btn-light-primary icon-btn b-r-22" href="animated_icon.php" target="_blank" role="button">
@@ -459,7 +604,7 @@ function LandingPage() {
                         <div className="col-sm-6 col-lg-3">
                           <div className="card demo-card">
                             <div className="card-body">
-                              <img alt="demo-img" className="img-fluid b-r-8" src={WeatherImg} />
+                              <img alt="demo-img" className="img-fluid b-r-8" src={WeatherImg} onError={handleImageError} />
                               <div className="demo-box">
                                 <h6 className="m-0 f-w-500 f-s-18">Weather Icons</h6>
                                 <a className="btn btn-light-primary icon-btn b-r-22" href="weather_icon.php" target="_blank" role="button">
@@ -478,8 +623,28 @@ function LandingPage() {
           </div>
         </section>
 
-        {/* Dark Layout Section (Static) */}
-        <section className="dark-section">
+        {/* Dark Layout Section */}
+        <section className="dark-section" style={{ position: 'relative' }}>
+          <i
+            className={`fas ${isSpeaking.dark ? 'fa-pause' : 'fa-volume-up'}`}
+            style={{
+              position: 'absolute',
+              top: '10px',
+              right: '10px',
+              fontSize: '1rem',
+              color: '#fff',
+              opacity: 0.7,
+              cursor: 'pointer',
+            }}
+            onClick={() =>
+              speakText(
+                'Discover Our Dark Layout. Embrace the elegance of the dark layout, where simplicity meets sophistication. Navigate effortlessly through your admin tasks with style.',
+                'dark'
+              )
+            }
+            onMouseEnter={(e) => (e.target.style.opacity = 1)}
+            onMouseLeave={(e) => (e.target.style.opacity = 0.7)}
+          ></i>
           <div className="container">
             <div className="row">
               <div className="col-xl-6 offset-xl-3">
@@ -496,12 +661,12 @@ function LandingPage() {
                 <div className="slider-container">
                   <div className="slider-container-box">
                     <div className="slider-slideLeft">
-                      <img alt="" className="img-fluid" src={DarkLayout} />
+                      <img alt="" className="img-fluid" src={DarkLayout} onError={handleImageError} />
                     </div>
                   </div>
                   <div className="slider-container-box slider-left">
                     <div className="slider-slideRight">
-                      <img alt="" className="img-fluid" src={DarkLayout1} />
+                      <img alt="" className="img-fluid" src={DarkLayout1} onError={handleImageError} />
                     </div>
                   </div>
                 </div>
@@ -516,20 +681,29 @@ function LandingPage() {
         </section>
 
         {/* Wrapper Section */}
-        <section className="box-wrapper-section p-0">
+        <section className="box-wrapper-section p-0" style={{ position: 'relative' }}>
           <div className="container-fluid box-wrapper">
+            <i
+              className={`fas ${isSpeaking.wrapper ? 'fa-pause' : 'fa-volume-up'}`}
+              style={{
+                position: 'absolute',
+                top: '10px',
+                right: '10px',
+                fontSize: '1rem',
+                color: '#666',
+                opacity: 0.7,
+                cursor: 'pointer',
+              }}
+              onClick={() =>
+                speakText(
+                  'Prioritization of Tasks with AI Assistance. Analytics Dashboard for Project Insights. Predictive Analytics for Risk & Deadline Management. Advanced Role-Based Access and Permissions. Task Dependencies and Milestone Tracking. Real-Time Project Status Updates. Task and Resource Allocation. Comprehensive Activity Log. Integration with 3rd Party Tools. Team Performance Metrics. Secure Cloud Storage for Documents.',
+                  'wrapper'
+                )
+              }
+              onMouseEnter={(e) => (e.target.style.opacity = 1)}
+              onMouseLeave={(e) => (e.target.style.opacity = 0.7)}
+            ></i>
             <ul className="box-wrapper-list">
-              <li>Prioritization of Tasks with AI Assistance</li>
-              <li>Analytics Dashboard for Project Insights</li>
-              <li>Predictive Analytics for Risk & Deadline Management</li>
-              <li>Advanced Role-Based Access and Permissions</li>
-              <li>Task Dependencies and Milestone Tracking</li>
-              <li>Real-Time Project Status Updates</li>
-              <li>Task and Resource Allocation</li>
-              <li>Comprehensive Activity Log</li>
-              <li>Integration with 3rd Party Tools</li>
-              <li>Team Performance Metrics</li>
-              <li>Secure Cloud Storage for Documents</li>
               <li>Prioritization of Tasks with AI Assistance</li>
               <li>Analytics Dashboard for Project Insights</li>
               <li>Predictive Analytics for Risk & Deadline Management</li>
@@ -546,7 +720,27 @@ function LandingPage() {
         </section>
 
         {/* Footer */}
-        <section className="landing-footer">
+        <section className="landing-footer" style={{ position: 'relative' }}>
+          <i
+            className={`fas ${isSpeaking.footer ? 'fa-pause' : 'fa-volume-up'}`}
+            style={{
+              position: 'absolute',
+              top: '10px',
+              right: '10px',
+              fontSize: '1rem',
+              color: '#fff',
+              opacity: 0.7,
+              cursor: 'pointer',
+            }}
+            onClick={() =>
+              speakText(
+                'The best AI powered Project Management platform! Our Features: User Authentication, Project Management, Task Management, Dashboard & Smart Notifications, Activity Log & History. Contact us: Phone +216 29 197 240, Email contact@orkestra.tn, Facebook, Instagram, Twitter.',
+                'footer'
+              )
+            }
+            onMouseEnter={(e) => (e.target.style.opacity = 1)}
+            onMouseLeave={(e) => (e.target.style.opacity = 0.7)}
+          ></i>
           <div className="container">
             <div className="d-flex align-items-between flex-wrap">
               <div className="col-md-3 text-white">
@@ -579,7 +773,7 @@ function LandingPage() {
                 </ul>
               </div>
               <div className="col-md-3 d-flex align-items-center justify-content-center">
-                <img alt="logo" src={LogoBlanc} width="300" />
+                <img alt="logo" src={LogoBlanc} width="300" onError={handleImageError} />
               </div>
             </div>
           </div>

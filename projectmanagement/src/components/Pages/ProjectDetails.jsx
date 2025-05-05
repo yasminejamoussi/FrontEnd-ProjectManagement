@@ -5,10 +5,10 @@ import { Stack } from '@phosphor-icons/react';
 import axios from 'axios';
 import Header from "../Layout/Header";
 import Sidebar from "../Layout/Sidebar";
-import avatar7 from '../../assets/images/avtar/7.png';
-import avatar13 from '../../assets/images/avtar/13.png';
-import avatar16 from '../../assets/images/avtar/16.png';
-import avatar4 from '../../assets/images/avtar/4.png';
+import avatar7 from '../../assets/images/avtar/user.jpg';
+import avatar13 from '../../assets/images/avtar/user.jpg';
+import avatar16 from '../../assets/images/avtar/user.jpg';
+import avatar4 from '../../assets/images/avtar/user.jpg';
 
 const ProjectDetails = () => {
   const { id } = useParams();
@@ -23,17 +23,17 @@ const ProjectDetails = () => {
   useEffect(() => {
     const fetchProjectDetails = async () => {
       setLoading(true);
-      console.log("ID du projet :", id); // Log de l’ID
+      console.log("ID du projet :", id);
       try {
         const [projectResponse, usersResponse] = await Promise.all([
           axios.get(`http://localhost:4000/api/projects/${id}`),
           axios.get("http://localhost:4000/api/auth/users"),
         ]);
         console.log("Réponse projet complète :", projectResponse.data);
-        console.log("teamMembers brut :", projectResponse.data.teamMembers); // Log spécifique pour teamMembers
+        console.log("teamMembers brut :", projectResponse.data.teamMembers);
         setProject(projectResponse.data);
         setTeamMembers(projectResponse.data.teamMembers || []);
-        console.log("teamMembers assigné :", projectResponse.data.teamMembers || []); // Log après assignation
+        console.log("teamMembers assigné :", projectResponse.data.teamMembers || []);
         const available = usersResponse.data.filter(user => {
           const roleName = user.role?.name;
           const isValidRole = ["Team Leader", "Team Member"].includes(roleName);
@@ -51,8 +51,7 @@ const ProjectDetails = () => {
     };
     fetchProjectDetails();
   }, [id]);
-  
-  // Ajout d’un log dans le rendu
+
   console.log("État teamMembers rendu :", teamMembers);
 
   const removeTeamMember = async (memberId) => {
@@ -144,8 +143,15 @@ const ProjectDetails = () => {
             <div className="row g-4">
               <div className="col-md-12 col-lg-6 col-xxl-4 order-1">
                 <div className="card shadow-sm border-0" style={{ borderRadius: '20px', overflow: 'hidden' }}>
-                  <div className="card-header bg-gradient-primary text-white py-4">
-                    <h4 className="m-0" style={{ fontWeight: '600' }}>Details of the project</h4>
+                  <div className="card-header bg-gradient-primary py-4 d-flex align-items-center justify-content-between">
+                    <h4 className="m-0 text-dark" style={{ fontWeight: '600' }}>Details of the project</h4>
+                    <NavLink
+                      to={`/kanban/${id}`}
+                      className="btn btn-outline-info btn-sm"
+                      title="View Kanban Board"
+                    >
+                      <i className="ti ti-list f-s-16"></i> View tasks
+                    </NavLink>
                   </div>
                   <div className="card-body p-5">
                     <table className="table table-borderless align-middle mb-0">
@@ -202,8 +208,22 @@ const ProjectDetails = () => {
 
               <div className="col-md-6 col-lg-6 col-xxl-4 order-2">
                 <div className="card shadow-sm border-0" style={{ borderRadius: '20px', overflow: 'hidden' }}>
-                  <div className="card-header bg-gradient-dark text-white py-4 d-flex align-items-center justify-content-between">
-                    <h4 className="m-0" style={{ fontWeight: '600' }}>Project Team</h4>
+                  <div className="card-header bg-gradient-dark py-4">
+                    <h4 className="m-0 text-dark" style={{ fontWeight: '600' }}>About the Project</h4>
+                  </div>
+                  <div className="card-body p-5">
+                    <div className="mb-3">
+                      <h6 className="text-dark">Project Description</h6>
+                      <p className="text-muted bg-light p-3 rounded" style={{ lineHeight: '1.6' }}>
+                        {project.description || "Aucune description disponible."}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="card shadow-sm border-0 mt-4" style={{ borderRadius: '20px', overflow: 'hidden' }}>
+                  <div className="card-header bg-gradient-dark py-4 d-flex align-items-center justify-content-between">
+                    <h4 className="m-0 text-dark" style={{ fontWeight: '600' }}>Project Team</h4>
                     <button
                       className="btn btn-light btn-sm shadow-sm"
                       onClick={() => setShowAddMemberModal(true)}
@@ -242,8 +262,8 @@ const ProjectDetails = () => {
 
               <div className="col-md-6 col-lg-6 col-xxl-4 order-3">
                 <div className="card shadow-sm border-0" style={{ borderRadius: '20px', overflow: 'hidden' }}>
-                  <div className="card-header bg-gradient-primary text-white py-4">
-                    <h4 className="m-0" style={{ fontWeight: '600' }}>Project Management</h4>
+                  <div className="card-header bg-gradient-primary py-4">
+                    <h4 className="m-0 text-dark" style={{ fontWeight: '600' }}>Project Management</h4>
                   </div>
                   <div className="card-body p-5">
                     <div className="mb-4 border-bottom pb-3">
@@ -270,6 +290,26 @@ const ProjectDetails = () => {
                         ))}
                       </ul>
                     </div>
+                    <div className="mb-4 border-bottom pb-3">
+                      <h6 className="f-w-600 mb-3 text-dark">
+                        <i className="ti ti-bulb me-2 text-warning"></i> Required Skills
+                      </h6>
+                      <div className="d-flex flex-wrap gap-2">
+                        {project.requiredSkills && project.requiredSkills.length > 0 ? (
+                          project.requiredSkills.map((skill, index) => (
+                            <span
+                              key={index}
+                              className="badge bg-primary text-white px-3 py-2"
+                              style={{ fontSize: '0.9rem', borderRadius: '15px' }}
+                            >
+                              {skill}
+                            </span>
+                          ))
+                        ) : (
+                          <p className="text-muted mb-0">No skills specified</p>
+                        )}
+                      </div>
+                    </div>
                     <div className="mb-3">
                       <h6 className="f-w-600 mb-3 text-dark">
                         <i className="ti ti-calendar me-2 text-danger"></i> Deadline
@@ -279,96 +319,80 @@ const ProjectDetails = () => {
                   </div>
                 </div>
               </div>
+            </div>
 
-              <div className="col-md-6 col-lg-6 col-xxl-4 order-4">
-                <div className="card shadow-sm border-0" style={{ borderRadius: '20px', overflow: 'hidden' }}>
-                  <div className="card-header bg-gradient-dark text-white py-4">
-                    <h4 className="m-0" style={{ fontWeight: '600' }}>About the Project</h4>
-                  </div>
-                  <div className="card-body p-5">
-                    <div className="mb-3">
-                      <h6 className="text-dark">Project Description</h6>
-                      <p className="text-muted bg-light p-3 rounded" style={{ lineHeight: '1.6' }}>
-                        {project.description || "Aucune description disponible."}
-                      </p>
+            {showAddMemberModal && (
+              <>
+                <div
+                  className="modal-backdrop fade show"
+                  style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                    zIndex: 1040,
+                  }}
+                  onClick={() => setShowAddMemberModal(false)}
+                />
+                <div className="modal fade show" style={{ display: 'block', zIndex: 1050 }}>
+                  <div className="modal-dialog modal-dialog-centered">
+                    <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '15px' }}>
+                      <div className="modal-header bg-light border-bottom-0 py-3">
+                        <h5 className="modal-title text-dark">Add a member to the team</h5>
+                        <button
+                          type="button"
+                          className="btn-close"
+                          onClick={() => setShowAddMemberModal(false)}
+                        ></button>
+                      </div>
+                      <div className="modal-body p-4">
+                        <form className="app-form" onSubmit={addTeamMember}>
+                          <div className="mb-4">
+                            <label htmlFor="memberSelect" className="form-label f-w-600 text-dark">Select a member</label>
+                            <select
+                              className="form-select shadow-sm"
+                              id="memberSelect"
+                              value={selectedMember}
+                              onChange={(e) => setSelectedMember(e.target.value)}
+                              style={{ borderRadius: '10px' }}
+                            >
+                              <option value="">Select a member...</option>
+                              {availableMembers.map((member) => (
+                                <option key={member._id} value={member._id}>
+                                  {member.firstname} {member.lastname} - {member.role?.name || "Rôle non défini"}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="modal-footer border-top-0 pt-0">
+                            <button
+                              type="button"
+                              className="btn btn-outline-secondary shadow-sm"
+                              onClick={() => setShowAddMemberModal(false)}
+                              style={{ borderRadius: '10px' }}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="submit"
+                              className="btn btn-primary shadow-sm"
+                              disabled={!selectedMember}
+                              style={{ borderRadius: '10px' }}
+                            >
+                              Add
+                            </button>
+                          </div>
+                        </form>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
+              </>
+            )}
           </div>
         </main>
-
-        {showAddMemberModal && (
-          <>
-            <div
-              className="modal-backdrop fade show"
-              style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                zIndex: 1040,
-              }}
-              onClick={() => setShowAddMemberModal(false)}
-            />
-            <div className="modal fade show" style={{ display: 'block', zIndex: 1050 }}>
-              <div className="modal-dialog modal-dialog-centered">
-                <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '15px' }}>
-                  <div className="modal-header bg-light border-bottom-0 py-3">
-                    <h5 className="modal-title text-dark">Add a member to the team</h5>
-                    <button
-                      type="button"
-                      className="btn-close"
-                      onClick={() => setShowAddMemberModal(false)}
-                    ></button>
-                  </div>
-                  <div className="modal-body p-4">
-                    <form className="app-form" onSubmit={addTeamMember}>
-                      <div className="mb-4">
-                        <label htmlFor="memberSelect" className="form-label f-w-600 text-dark">Select a member</label>
-                        <select
-                          className="form-select shadow-sm"
-                          id="memberSelect"
-                          value={selectedMember}
-                          onChange={(e) => setSelectedMember(e.target.value)}
-                          style={{ borderRadius: '10px' }}
-                        >
-                          <option value="">Select a member...</option>
-                          {availableMembers.map((member) => (
-                            <option key={member._id} value={member._id}>
-                              {member.firstname} {member.lastname} - {member.role?.name || "Rôle non défini"}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="modal-footer border-top-0 pt-0">
-                        <button
-                          type="button"
-                          className="btn btn-outline-secondary shadow-sm"
-                          onClick={() => setShowAddMemberModal(false)}
-                          style={{ borderRadius: '10px' }}
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="submit"
-                          className="btn btn-primary shadow-sm"
-                          disabled={!selectedMember}
-                          style={{ borderRadius: '10px' }}
-                        >
-                          Add
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
       </div>
 
       <div className="go-top" style={{ backgroundColor: '#007bff', borderRadius: '50%' }}>

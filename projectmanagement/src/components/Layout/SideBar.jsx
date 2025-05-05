@@ -14,20 +14,19 @@ const menuConfig = {
   },
   projects: {
     label: 'Project Management',
-    icon: 'iconoir-folder',
+    icon: 'iconoir-folder', 
     roles: ['Admin', 'Project Manager', 'Team Leader', 'Team Member', 'Guest'],
-    paths: ['/projects'],
+    paths: ['/projects','/team'],
     subItems: [
       { label: 'Projects', path: '/projects' },
-     
-    ],
+      { label: 'Teams', path: '/team' }] ,
   },
   tasks: {
     label: 'Task Management',
     icon: 'iconoir-task-list',
     roles: ['Admin', 'Project Manager', 'Team Leader', 'Team Member', 'Guest'],
-    paths: ['/tasks'],
-    subItems: [{ label: 'Tasks', path: '/tasks' }],
+    paths: ['/tasksusers'],
+    subItems: [{ label: 'Tasks', path: '/tasksusers' }],
   },
   notifications: {
     label: 'Smart Notifications',
@@ -40,8 +39,8 @@ const menuConfig = {
     label: 'Activity Log',
     icon: 'iconoir-eye',
     roles: ['Admin', 'Project Manager', 'Team Leader'],
-    paths: ['/activity-log'],
-    subItems: [{ label: 'Activity History', path: '/activity-log' }],
+    paths: ['/activitylogs'],
+    subItems: [{ label: 'Activity History', path: '/activitylogs' }],
   },
   auth: {
     label: 'User Management',
