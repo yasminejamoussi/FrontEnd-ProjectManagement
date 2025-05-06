@@ -11,10 +11,10 @@ RUN npm install --legacy-peer-deps
 # Copier le reste des fichiers
 COPY . .
 
-# Vérifier que vite est installé et exécutable
+# Installer vite, appliquer les permissions, puis vérifier la version
 RUN npm install vite --save-dev && \
-    npx vite --version && \
-    chmod +x node_modules/.bin/vite
+    chmod +x node_modules/.bin/vite && \
+    npx vite --version
 
 # Construire l'application
 RUN npm run build
