@@ -4,12 +4,12 @@ FROM node:18 AS builder
 # Set the working directory
 WORKDIR /src
 
-# Copy package.json and package-lock.json from the projectmanagement subdirectory
-COPY projectmanagement/package*.json ./
+# Copy package.json and package-lock.json
+COPY package*.json ./
 RUN npm install --legacy-peer-deps
 
 # Copy the rest of the frontend code
-COPY projectmanagement/ .
+COPY . .
 
 # Build the React app
 RUN npm run build
