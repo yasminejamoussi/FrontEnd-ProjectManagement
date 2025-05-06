@@ -29,7 +29,7 @@ const SignUp = () => {
 
     try {
       const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL ;
-      const response = await fetch(`${apiBaseUrl}/register`, {
+      const response = await fetch(`${apiBaseUrl}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
