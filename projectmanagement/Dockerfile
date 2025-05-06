@@ -11,6 +11,9 @@ COPY package*.json ./
 RUN npm cache clean --force
 RUN npm install --legacy-peer-deps
 
+# Explicitly install vite to ensure it's available
+RUN npm install vite@^6.1.0
+
 # Verify vite is installed
 RUN npm list vite || echo "vite not found"
 
