@@ -1,32 +1,28 @@
-# Use Node.js 18 as the base image
+# Étape 1 : Build
 FROM node:18 AS builder
-
-# Set the working directory
 WORKDIR /src
 
-# Copy only package files first (leverage caching)
+# Copier package.json et package-lock.json pour le caching
 COPY package*.json ./
 
-# Clean npm cache and install ALL dependencies including devDependencies
-RUN npm cache clean --force
-RUN npm install --legacy-peer-deps --include=dev --force
+# Installer les dépendances
+RUN npm install --legacy-peer-deps
 
-# Fix permissions for executable files in node_modules/.bin
-RUN chmod -R +x /src/node_modules/.bin/
-
-# Verify vite is installed
-RUN npm list vite || echo "vite not found"
-
-# Copy the rest of the application code
+# Copier le reste des fichiers
 COPY . .
 
-# Build the React app
+# Vérifier que vite est installé et exécutable
+RUN npm install vite --save-dev && \
+    npx vite --version && \
+    chmod +x node_modules/.bin/vite
+
+# Construire l'application
 RUN npm run build
 
-# Stage 2: Serve the static files
+# Étape 2 : Servir les fichiers statiques
 FROM node:18
 WORKDIR /src
 RUN npm install -g serve
-COPY --from=builder /src/build ./build
+COPY --from=builder /src/dist ./dist
 EXPOSE 80
-CMD ["serve", "-s", "build", "-l", "80"]
+CMD ["serve", "-s", "dist", "-l", "80"]
