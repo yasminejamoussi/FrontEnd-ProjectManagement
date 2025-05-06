@@ -4,26 +4,23 @@ FROM node:18 AS builder
 # Set the working directory
 WORKDIR /src
 
-# Copy package.json and package-lock.json
+# Copy only package files first (leverage caching)
 COPY package*.json ./
 
-# Clean npm cache and install dependencies
+# Clean npm cache and install ALL dependencies including devDependencies
 RUN npm cache clean --force
 RUN npm install --legacy-peer-deps
-
-# Explicitly install vite to ensure it's available
-RUN npm install vite@^6.1.0
 
 # Verify vite is installed
 RUN npm list vite || echo "vite not found"
 
-# Copy the rest of the frontend code
+# Copy the rest of the application code
 COPY . .
 
 # Build the React app
 RUN npm run build
 
-# Étape 2 : Servir les fichiers statiques
+# Stage 2: Serve the static files
 FROM node:18
 WORKDIR /src
 RUN npm install -g serve
