@@ -1,11 +1,9 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: "http://localhost:4000/api/auth",
+  baseURL: process.env.REACT_APP_API_URL || "http://localhost:4000/api/auth", // Défaut local
   // withCredentials: true,
 });
 
 // Authentification Google
 export const googleAuth = (code) => api.get(`/google?code=${code}`);
-
-
