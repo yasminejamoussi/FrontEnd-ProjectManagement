@@ -6,7 +6,13 @@ WORKDIR /src
 
 # Copy package.json and package-lock.json
 COPY package*.json ./
+
+# Clean npm cache and install dependencies
+RUN npm cache clean --force
 RUN npm install --legacy-peer-deps
+
+# Verify vite is installed
+RUN npm list vite || echo "vite not found"
 
 # Copy the rest of the frontend code
 COPY . .
