@@ -28,7 +28,8 @@ const SignUp = () => {
     console.log("Form Data:", formData);
 
     try {
-      const response = await fetch('http://localhost:4000/api/auth/register', {
+      const apiBaseUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:4000/api/auth"; // Fallback local
+      const response = await fetch(`${apiBaseUrl}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
