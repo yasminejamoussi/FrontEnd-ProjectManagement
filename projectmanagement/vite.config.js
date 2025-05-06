@@ -11,6 +11,6 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: 'build', // Change la sortie par défaut de "dist" à "build"
+    outDir: 'dist', // Change la sortie par défaut de "dist" à "build"
   },
 });
