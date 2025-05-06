@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Helmet } from 'react-helmet-async';
 import Header from '../Layout/Header';
-import Sidebar from '../Layout/Sidebar';
+import Sidebar from '../Layout/SideBar';
 
 const NotificationsPage = () => {
   const navigate = useNavigate();

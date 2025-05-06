@@ -4,7 +4,7 @@ import { Modal, Button } from "react-bootstrap";
 import { Link } from "react-router-dom";
 import { FaTrash, FaEdit, FaSearch } from "react-icons/fa";
 import Header from "../Layout/Header";
-import Sidebar from "../Layout/Sidebar";
+import Sidebar from '../Layout/SideBar';
 
 const ApiPage = () => {
   const [users, setUsers] = useState([]);

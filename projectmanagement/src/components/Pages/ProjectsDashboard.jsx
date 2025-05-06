@@ -3,7 +3,7 @@ import { Helmet } from 'react-helmet-async';
 import { NavLink } from 'react-router-dom';
 import axios from 'axios';
 import Header from "../Layout/Header";
-import Sidebar from "../Layout/Sidebar";
+import Sidebar from '../Layout/SideBar';
 import logo1 from '../../assets/images/avtar/user.jpg';
 import { jwtDecode } from "jwt-decode";
 

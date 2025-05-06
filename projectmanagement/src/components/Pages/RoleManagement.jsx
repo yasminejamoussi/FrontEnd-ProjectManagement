@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Modal, Button } from "react-bootstrap";
 import Header from "../Layout/Header";
-import Sidebar from "../Layout/Sidebar";
+import Sidebar from '../Layout/SideBar';
 import axios from "axios";
 import { FaTrash, FaEdit, FaSearch } from "react-icons/fa";
 

@@ -9,7 +9,10 @@ COPY package*.json ./
 
 # Clean npm cache and install ALL dependencies including devDependencies
 RUN npm cache clean --force
-RUN npm install --legacy-peer-deps
+RUN npm install --legacy-peer-deps --include=dev --force
+
+# Fix permissions for executable files in node_modules/.bin
+RUN chmod -R +x /src/node_modules/.bin/
 
 # Verify vite is installed
 RUN npm list vite || echo "vite not found"
