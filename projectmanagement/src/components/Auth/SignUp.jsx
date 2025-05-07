@@ -94,7 +94,9 @@ const SignUp = () => {
     console.log("Bouton cliqué !");
 
     try {
-      const response = await axios.get("http://localhost:4000/api/auth/generate-password");
+      //const response = await axios.get("http://localhost:4000/api/auth/generate-password");
+      const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL; // Use the same env variable as signup
+    const response = await axios.get(`${apiBaseUrl}/api/auth/generate-password`);
 
       setSuggestedPassword(response.data.password);
       console.log("Suggested password :", response.data.password);

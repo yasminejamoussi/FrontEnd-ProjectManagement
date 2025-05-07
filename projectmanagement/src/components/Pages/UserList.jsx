@@ -19,7 +19,8 @@ const ApiPage = () => {
   const [roleFilter, setRoleFilter] = useState("All");
 
   useEffect(() => {
-    axios.get("http://localhost:4000/api/auth/users")
+    const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL;
+    axios.get(`${apiBaseUrl}/api/auth/users`)
       .then((response) => {
         setUsers(response.data);
         setFilteredUsers(response.data);
@@ -51,7 +52,8 @@ const ApiPage = () => {
 
   const handleConfirmDelete = () => {
     if (selectedUser) {
-      axios.delete(`http://localhost:4000/api/auth/users/${selectedUser._id}`)
+      const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL;
+      axios.delete(`${apiBaseUrl}/api/auth/users/${selectedUser._id}`)
         .then(() => {
           setUsers(users.filter(user => user._id !== selectedUser._id));
           setFilteredUsers(filteredUsers.filter(user => user._id !== selectedUser._id));
@@ -98,7 +100,8 @@ const ApiPage = () => {
   };
 
   const handleSaveUser = () => {
-    axios.put(`http://localhost:4000/api/auth/users/${selectedUser._id}`, selectedUser)
+    const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL;
+    axios.put(`${apiBaseUrl}/api/auth/users/${selectedUser._id}`, selectedUser)
       .then(() => {
         setUsers(users.map(user => (user._id === selectedUser._id ? selectedUser : user)));
         setFilteredUsers(filteredUsers.map(user => (user._id === selectedUser._id ? selectedUser : user)));
