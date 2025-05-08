@@ -20,8 +20,9 @@ const UserList = () => {
   const [formErrors, setFormErrors] = useState({});
   const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:4000';
 
+  // Regex plus permissive pour les numéros de téléphone
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const phoneRegex = /^[+]?[\d\s-]{8,15}$/;
+  const phoneRegex = /^[+]?[\d\s\-\(\)\.]{8,15}$/;
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -134,10 +135,15 @@ const UserList = () => {
     if (!validateForm()) return;
 
     const token = localStorage.getItem('token');
+    // Nettoyer le numéro de téléphone
+    const cleanedPhone = selectedUser.phone.replace(/[\s\-\(\)\.]+/g, '');
+    console.log('Numéro de téléphone envoyé:', cleanedPhone);
+    console.log('Données envoyées:', { ...selectedUser, phone: cleanedPhone });
+
     try {
       const response = await axios.put(
         `${apiBaseUrl}/api/auth/users/${selectedUser._id}`,
-        selectedUser,
+        { ...selectedUser, phone: cleanedPhone },
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -412,7 +418,7 @@ const UserList = () => {
                 name="phone"
                 value={selectedUser?.phone || ''}
                 onChange={handleInputChange}
-                placeholder="Téléphone"
+                placeholder="Téléphone (ex: +21612345678)"
               />
               {formErrors.phone && (
                 <small className="text-danger">{formErrors.phone}</small>
