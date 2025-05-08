@@ -28,7 +28,8 @@ const SignUp = () => {
     console.log("Form Data:", formData);
 
     try {
-      const response = await fetch('http://localhost:4000/api/auth/register', {
+      const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL ;
+      const response = await fetch(`${apiBaseUrl}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -93,8 +94,9 @@ const SignUp = () => {
     console.log("Bouton cliqué !");
 
     try {
-      const response = await axios.get("http://localhost:4000/api/auth/generate-password");
-
+      //const response = await axios.get("http://localhost:4000/api/auth/generate-password");
+      const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL; // Use the same env variable as signup
+      const response = await axios.get(`${apiBaseUrl}/api/auth/generate-password`);
       setSuggestedPassword(response.data.password);
       console.log("Suggested password :", response.data.password);
     } catch (error) {

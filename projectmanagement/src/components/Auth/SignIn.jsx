@@ -43,7 +43,9 @@ const SignIn = () => {
 
     try {
       console.log("Sending login request with:", { email, password });
-      const response = await axios.post("http://localhost:4000/api/auth/login", { email, password });
+      //const response = await axios.post("http://localhost:4000/api/auth/login", { email, password });
+      const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL;
+      const response = await axios.post(`${apiBaseUrl}/api/auth/login`, { email, password });
       console.log("API response:", response.data);
 
       if (response.data.message === "2FA required") {
@@ -109,7 +111,9 @@ const SignIn = () => {
     try {
       setLoading(true);
       console.log("FaceID login attempt with label:", label);
-      const response = await axios.post("http://localhost:4000/api/auth/login-with-face", { label });
+      //const response = await axios.post("http://localhost:4000/api/auth/login-with-face", { label });
+      const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL;
+      const response = await axios.post(`${apiBaseUrl}/api/auth/login-with-face`, { label });
       console.log("FaceID API response:", response.data);
 
       if (response.data.message === "2FA required") {

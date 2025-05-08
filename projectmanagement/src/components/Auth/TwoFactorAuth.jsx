@@ -21,12 +21,18 @@ const TwoFactorAuth = () => {
         if (!token) {
           throw new Error("Token manquant !");
         }
+        
 
-        const response = await axios.post(
-          "http://localhost:4000/api/auth/generate-2fa",
-          { email },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+       
+        const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL;
+        const response = await fetch(`${apiBaseUrl}/api/auth/generate-2fa`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ email }),
+        });
 
         console.log("📌 Réponse API QR Code:", response.data);
 
@@ -59,11 +65,16 @@ const TwoFactorAuth = () => {
       }
 
       // Activer le 2FA
-      const enableResponse = await axios.post(
-        "http://localhost:4000/api/auth/enable-2fa",
-        { email, token: verificationCode },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+   
+      const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL;
+      const enableResponse = await fetch(`${apiBaseUrl}/api/auth/enable-2fa`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ email, token: verificationCode }),
+      });
 
       console.log("📌 Réponse API Enable 2FA:", enableResponse.data);
 
@@ -72,11 +83,14 @@ const TwoFactorAuth = () => {
       }
 
       // Vérifier le 2FA et récupérer le token
-      const verifyResponse = await axios.post(
-        "http://localhost:4000/api/auth/verify-2fa",
-        { email, token: verificationCode },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const verifyResponse = await fetch(`${apiBaseUrl}/api/auth/verify-2fa`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ email, token: verificationCode }),
+      });
 
       console.log("📌 Réponse API Vérification 2FA:", verifyResponse.data);
 

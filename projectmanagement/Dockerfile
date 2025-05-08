@@ -1,21 +1,28 @@
-# Use Node.js 16 as the base image
-FROM node:18
-
-# Set the working directory inside the container
+# Étape 1 : Build
+FROM node:18 AS builder
 WORKDIR /src
 
-# Copy package.json and package-lock.json first (for caching)
+# Copier package.json et package-lock.json pour le caching
 COPY package*.json ./
 
-# Install dependencies
-#RUN npm install 
+# Installer les dépendances
 RUN npm install --legacy-peer-deps
 
-# Copy everything, including public, src, and other necessary files
-COPY . .  
+# Copier le reste des fichiers
+COPY . .
 
-# Expose the port your app runs on
-EXPOSE 5173
+# Installer vite, appliquer les permissions, puis vérifier la version
+RUN npm install vite --save-dev && \
+    chmod +x node_modules/.bin/vite && \
+    npx vite --version
 
-# Start the React development server
-CMD ["npm", "run", "dev"]
+# Construire l'application
+RUN npm run build
+
+# Étape 2 : Servir les fichiers statiques
+FROM node:18
+WORKDIR /src
+RUN npm install -g serve
+COPY --from=builder /src/dist ./dist
+EXPOSE 80
+CMD ["serve", "-s", "dist", "-l", "80"]
