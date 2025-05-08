@@ -1,274 +1,426 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { Modal, Button } from 'react-bootstrap';
+import { FaTrash, FaEdit, FaSearch } from 'react-icons/fa';
 import Header from '../Layout/Header';
 import Sidebar from '../Layout/SideBar';
-import '../../assets/vendor/glightbox/glightbox.min.css';
-import '../../assets/vendor/apexcharts/apexcharts.css';
-import '../../assets/vendor/select/select2.min.css';
-import '../../assets/css/style.css';
-import '../../assets/css/responsive.css';
+import { useNavigate } from 'react-router-dom';
 
-const UpdateUser = () => {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL;
-
-  const [user, setUser] = useState({ firstname: '', lastname: '', phone: '', email: '', role: '' });
+const UserList = () => {
+  const [users, setUsers] = useState([]);
+  const [filteredUsers, setFilteredUsers] = useState([]);
   const [roles, setRoles] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [entries, setEntries] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [roleFilter, setRoleFilter] = useState('All');
   const [error, setError] = useState(null);
-  const [formErrors, setFormErrors] = useState({});
-
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const phoneRegex = /^[+]?[\d\s-]{8,15}$/;
+  const navigate = useNavigate();
+  const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:4000';
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
+      console.error('Aucun token trouvé.');
       setError('Vous devez être connecté.');
-      setLoading(false);
       return;
     }
 
     Promise.all([
-      axios.get(`${apiBaseUrl}/api/auth/users/${id}`, {
+      axios.get(`${apiBaseUrl}/api/auth/users`, {
         headers: { Authorization: `Bearer ${token}` },
+      }).catch((err) => {
+        console.error('Erreur lors de la récupération des utilisateurs:', err);
+        throw err;
       }),
       axios.get(`${apiBaseUrl}/api/roles`, {
         headers: { Authorization: `Bearer ${token}` },
+      }).catch((err) => {
+        console.error('Erreur lors de la récupération des rôles:', err);
+        throw err;
       }),
     ])
-      .then(([userResponse, rolesResponse]) => {
-        setUser({
-          ...userResponse.data,
-          role: userResponse.data.role?.name || '',
-        });
+      .then(([usersResponse, rolesResponse]) => {
+        console.log('Utilisateurs récupérés:', usersResponse.data);
+        console.log('Rôles récupérés:', rolesResponse.data);
+        setUsers(usersResponse.data);
+        setFilteredUsers(usersResponse.data);
         setRoles(rolesResponse.data);
-        setLoading(false);
       })
       .catch((error) => {
-        console.error('Erreur lors du chargement des données:', error);
-        setError('Impossible de charger les données.');
-        setLoading(false);
+        console.error('Erreur lors de la récupération des données:', error);
+        setError(error.response?.data?.message || 'Impossible de charger les données.');
       });
-  }, [id, apiBaseUrl]);
+  }, [apiBaseUrl]);
 
-  const validateForm = () => {
-    const errors = {};
+  useEffect(() => {
+    console.log('Mise à jour du filtre - searchTerm:', searchTerm, 'roleFilter:', roleFilter);
+    const filtered = users.filter((user) => {
+      const matchesFirstName = user.firstname?.toLowerCase().includes(searchTerm.toLowerCase()) || false;
+      const matchesPhone = user.phone?.toLowerCase().includes(searchTerm.toLowerCase()) || false;
+      const matchesRole = roleFilter === 'All' || user.role?.name === roleFilter;
+      return (matchesFirstName || matchesPhone) && matchesRole;
+    });
+    console.log('Utilisateurs filtrés:', filtered);
+    setFilteredUsers(filtered);
+    setCurrentPage(1); // Réinitialiser à la première page lors du filtrage
+  }, [searchTerm, roleFilter, users]);
 
-    if (!user.firstname.trim()) errors.firstname = 'Le prénom est requis.';
-    if (!user.lastname.trim()) errors.lastname = 'Le nom est requis.';
-    if (!user.phone.trim()) errors.phone = 'Le numéro de téléphone est requis.';
-    else if (!phoneRegex.test(user.phone)) errors.phone = 'Le numéro de téléphone est invalide.';
-    if (!user.email.trim()) errors.email = 'L\'email est requis.';
-    else if (!emailRegex.test(user.email)) errors.email = 'L\'email est invalide.';
-    if (!user.role) errors.role = 'Le rôle est requis.';
-
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
+  const handleDeleteClick = (user) => {
+    setSelectedUser(user);
+    setShowDeleteModal(true);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleCloseDeleteModal = () => {
+    setShowDeleteModal(false);
+    setSelectedUser(null);
+  };
 
-    if (!validateForm()) return;
-
-    try {
+  const handleConfirmDelete = async () => {
+    if (selectedUser) {
       const token = localStorage.getItem('token');
-      const response = await axios.put(
-        `${apiBaseUrl}/api/auth/users/${id}`,
-        user,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      if (response.status === 200) {
-        alert('Utilisateur mis à jour avec succès !');
-        navigate('/users');
+      try {
+        await axios.delete(`${apiBaseUrl}/api/auth/users/${selectedUser._id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setUsers(users.filter((user) => user._id !== selectedUser._id));
+        setFilteredUsers(filteredUsers.filter((user) => user._id !== selectedUser._id));
+      } catch (error) {
+        console.error('Erreur lors de la suppression de l\'utilisateur:', error);
+        alert(error.response?.data?.message || 'Erreur lors de la suppression.');
       }
-    } catch (error) {
-      console.error('Erreur lors de la mise à jour de l\'utilisateur:', error);
-      alert(error.response?.data?.message || 'Une erreur est survenue lors de la mise à jour.');
+    }
+    setShowDeleteModal(false);
+  };
+
+  const handlePageChange = (newPage) => {
+    const totalPages = Math.ceil(filteredUsers.length / entries);
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
     }
   };
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setUser((prevUser) => ({
-      ...prevUser,
-      [name]: value,
-    }));
+  const getRoleStyle = (roleName) => {
+    if (!roleName) return { class: 'bg-secondary', color: '#000' };
+    switch (roleName) {
+      case 'Admin':
+        return { class: 'bg-danger', color: '#fff' };
+      case 'Guest':
+        return { class: 'bg-success', color: '#fff' };
+      case 'Team Leader':
+        return { class: 'bg-warning', color: '#000' };
+      case 'Team Member':
+        return { class: 'bg-info', color: '#fff' };
+      case 'Project Manager':
+        return { class: 'bg-primary', color: '#fff' };
+      default:
+        return { class: 'bg-secondary', color: '#000' };
+    }
   };
 
-  if (loading) return <p>Chargement...</p>;
+  const handleEditClick = (user) => {
+    setSelectedUser({ ...user, role: user.role?.name || '' });
+    setShowEditModal(true);
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setSelectedUser((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSaveUser = async () => {
+    const token = localStorage.getItem('token');
+    try {
+      const response = await axios.put(
+        `${apiBaseUrl}/api/auth/users/${selectedUser._id}`,
+        selectedUser,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setUsers(users.map((user) => (user._id === selectedUser._id ? response.data : user)));
+      setFilteredUsers(filteredUsers.map((user) => (user._id === selectedUser._id ? response.data : user)));
+      setShowEditModal(false);
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour de l\'utilisateur:', error);
+      alert(error.response?.data?.message || 'Erreur lors de la mise à jour.');
+    }
+  };
+
+  const handleNavigateToUpdate = (userId) => {
+    if (userId) {
+      navigate(`/users/${userId}`);
+    } else {
+      console.error('ID utilisateur non défini pour la navigation:', userId);
+    }
+  };
+
+  const indexOfLastUser = currentPage * entries;
+  const indexOfFirstUser = indexOfLastUser - entries;
+  const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
+  const totalPages = Math.ceil(filteredUsers.length / entries);
+
   if (error) return <p>{error}</p>;
 
   return (
     <div className="app-wrapper">
+      <Header />
       <Sidebar />
       <div className="app-content">
-        <Header />
         <main>
           <div className="container-fluid">
-            <div className="row m-1">
+            <h4 className="section-title f-w-700 mb-4">Users Management</h4>
+            <div className="row mb-4">
               <div className="col-12">
-                <h4 className="main-title">Setting</h4>
-                <ul className="app-line-breadcrumbs mb-3"></ul>
+                <div className="card shadow-sm p-3" style={{ backgroundColor: '#f8f9fa', borderRadius: '10px' }}>
+                  <h5 style={{ color: '#34495e', marginBottom: '15px' }}>Filters</h5>
+                  <form className="d-flex flex-wrap gap-3 align-items-end">
+                    <div className="form-group">
+                      <label htmlFor="filterEntries" className="form-label" style={{ color: '#7f8c8d' }}>
+                        Show Entries
+                      </label>
+                      <select
+                        id="filterEntries"
+                        name="entries"
+                        className="form-select"
+                        style={{ minWidth: '150px', borderColor: '#ced4da', borderRadius: '5px' }}
+                        value={entries}
+                        onChange={(e) => setEntries(parseInt(e.target.value))}
+                        aria-label="Select number of entries"
+                      >
+                        <option value="10">10</option>
+                        <option value="25">25</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="filterRole" className="form-label" style={{ color: '#7f8c8d' }}>
+                        Role
+                      </label>
+                      <select
+                        id="filterRole"
+                        className="form-select"
+                        style={{ minWidth: '200px', borderColor: '#ced4da', borderRadius: '5px' }}
+                        value={roleFilter}
+                        onChange={(e) => setRoleFilter(e.target.value)}
+                        aria-label="Filter by role"
+                      >
+                        <option value="All">All</option>
+                        {roles.map((role) => (
+                          <option key={role._id} value={role.name}>
+                            {role.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="filterSearch" className="form-label" style={{ color: '#7f8c8d' }}>
+                        Search
+                      </label>
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <FaSearch />
+                        </span>
+                        <input
+                          id="filterSearch"
+                          type="search"
+                          className="form-control"
+                          style={{ borderColor: '#ced4da', borderRadius: '5px' }}
+                          placeholder="Search by name or phone..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          aria-label="Search by name or phone"
+                        />
+                      </div>
+                    </div>
+                  </form>
+                </div>
               </div>
             </div>
 
             <div className="row">
-              <div className="col-lg-8 col-xxl-9">
-                <div className="tab-content">
-                  <div className="tab-pane fade active show" id="profile-tab-pane">
-                    <div className="card setting-profile-tab">
-                      <div className="card-header">
-                        <h5>Profile</h5>
-                      </div>
-                      <div className="card-body">
-                        <div className="profile-tab profile-container">
-                          <div className="image-details">
-                            <div className="profile-image"></div>
-                            <div className="profile-pic">
-                              <div className="avatar-upload">
-                                <div className="avatar-edit">
-                                  <input type="file" id="imageUpload" accept=".png, .jpg, .jpeg" />
-                                  <label htmlFor="imageUpload">
-                                    <i className="ti ti-photo-heart"></i>
-                                  </label>
-                                </div>
-                                <div className="avatar-preview">
-                                  <div id="imgPreview"></div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="person-details">
-                            <h5 className="f-w-600">
-                              {user.firstname} {user.lastname}
-                              <img
-                                width="20"
-                                height="20"
-                                src="../public/images/profile-app/01.png"
-                                alt="instagram-check-mark"
-                              />
-                            </h5>
-                            <p>{user.role || 'Rôle non défini'}</p>
-                          </div>
-                          <form className="app-form" onSubmit={handleSubmit}>
-                            <h5 className="mb-2 text-dark f-w-600">User Info</h5>
-                            <div className="row">
-                              <div className="col-md-6">
-                                <div className="mb-3">
-                                  <label className="form-label">First</label>
-                                  <input
-                                    type="text"
-                                    className="form-control"
-                                    placeholder="*****"
-                                    name="firstname"
-                                    value={user.firstname}
-                                    onChange={handleChange}
-                                  />
-                                  {formErrors.firstname && (
-                                    <small className="text-danger">{formErrors.firstname}</small>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="col-md-6">
-                                <div className="mb-3">
-                                  <label className="form-label">Last</label>
-                                  <input
-                                    type="text"
-                                    className="form-control"
-                                    placeholder="*****"
-                                    name="lastname"
-                                    value={user.lastname}
-                                    onChange={handleChange}
-                                  />
-                                  {formErrors.lastname && (
-                                    <small className="text-danger">{formErrors.lastname}</small>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="col-md-6">
-                                <div className="mb-3">
-                                  <label className="form-label">Phone</label>
-                                  <input
-                                    type="text"
-                                    className="form-control"
-                                    placeholder="+216*"
-                                    name="phone"
-                                    value={user.phone}
-                                    onChange={handleChange}
-                                  />
-                                  {formErrors.phone && (
-                                    <small className="text-danger">{formErrors.phone}</small>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="col-12">
-                                <div className="mb-3">
-                                  <label className="form-label">Email address</label>
-                                  <input
-                                    type="email"
-                                    className="form-control"
-                                    placeholder="MariaCEck@teleworm.us"
-                                    name="email"
-                                    value={user.email}
-                                    onChange={handleChange}
-                                  />
-                                  {formErrors.email && (
-                                    <small className="text-danger">{formErrors.email}</small>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="col-12">
-                                <div className="mb-3">
-                                  <label className="form-label">Role</label>
-                                  <select
-                                    className="form-control"
-                                    name="role"
-                                    value={user.role}
-                                    onChange={handleChange}
+              <div className="col-12">
+                <div className="card shadow-sm">
+                  <div className="card-body py-3 px-0 overflow-hidden">
+                    <div className="table-responsive app-scroll">
+                      <table className="table align-middle project-status-table mb-0" role="grid">
+                        <thead>
+                          <tr>
+                            <th scope="col">First Name</th>
+                            <th scope="col">Last Name</th>
+                            <th scope="col">Phone</th>
+                            <th scope="col">Email</th>
+                            <th scope="col">Role</th>
+                            <th scope="col">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {currentUsers.length > 0 ? (
+                            currentUsers.map((user) => (
+                              <tr key={user._id}>
+                                <td>
+                                  <h6 className="mb-0 text-success-dark text-nowrap">{user.firstname || 'N/A'}</h6>
+                                </td>
+                                <td>
+                                  <h6 className="mb-0 text-success-dark text-nowrap">{user.lastname || 'N/A'}</h6>
+                                </td>
+                                <td className="text-success-dark f-w-600">{user.phone || 'N/A'}</td>
+                                <td className="text-success-dark f-w-600">{user.email || 'N/A'}</td>
+                                <td>
+                                  <span
+                                    className={`badge ${getRoleStyle(user.role?.name).class} f-s-11 f-w-700 px-2 py-1`}
+                                    style={{ color: getRoleStyle(user.role?.name).color }}
                                   >
-                                    <option value="">Sélectionner un rôle</option>
-                                    {roles.map((role) => (
-                                      <option key={role._id} value={role.name}>
-                                        {role.name}
-                                      </option>
-                                    ))}
-                                  </select>
-                                  {formErrors.role && (
-                                    <small className="text-danger">{formErrors.role}</small>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="col-12">
-                                <div className="text-end">
-                                  <button type="submit" className="btn btn-primary">
-                                    Submit
+                                    {user.role?.name || 'Unknown'}
+                                  </span>
+                                </td>
+                                <td>
+                                  <button
+                                    type="button"
+                                    className="btn btn-danger btn-sm me-2"
+                                    onClick={() => handleDeleteClick(user)}
+                                  >
+                                    <FaTrash />
                                   </button>
-                                </div>
-                              </div>
-                            </div>
-                          </form>
-                        </div>
-                      </div>
+                                  <button
+                                    type="button"
+                                    className="btn btn-success btn-sm"
+                                    onClick={() => handleNavigateToUpdate(user._id)}
+                                  >
+                                    <FaEdit />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan="6" className="text-center">
+                                Aucun utilisateur disponible
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
+                </div>
+                <div className="table-footer d-flex justify-content-between align-items-center mt-3">
+                  <p className="mb-0 f-s-15 f-w-500 txt-ellipsis-1">
+                    Showing {currentUsers.length} of {filteredUsers.length} entries
+                  </p>
+                  <ul className="pagination app-pagination justify-content-end">
+                    <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                      <a
+                        className="page-link b-r-left"
+                        href="#"
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        aria-label="Previous"
+                      >
+                        Previous
+                      </a>
+                    </li>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <li key={page} className={`page-item ${currentPage === page ? 'active' : ''}`}>
+                        <a className="page-link" href="#" onClick={() => handlePageChange(page)}>
+                          {page}
+                        </a>
+                      </li>
+                    ))}
+                    <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+                      <a
+                        className="page-link b-r-right"
+                        href="#"
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        aria-label="Next"
+                      >
+                        Next
+                      </a>
+                    </li>
+                  </ul>
                 </div>
               </div>
             </div>
           </div>
         </main>
       </div>
+
+      <Modal show={showEditModal} onHide={() => setShowEditModal(false)}>
+        <Modal.Body>
+          <h4>Update User</h4>
+          <input
+            type="text"
+            className="form-control mb-2"
+            name="firstname"
+            value={selectedUser?.firstname || ''}
+            onChange={handleInputChange}
+            placeholder="Prénom"
+          />
+          <input
+            type="text"
+            className="form-control mb-2"
+            name="lastname"
+            value={selectedUser?.lastname || ''}
+            onChange={handleInputChange}
+            placeholder="Nom"
+          />
+          <input
+            type="text"
+            className="form-control mb-2"
+            name="phone"
+            value={selectedUser?.phone || ''}
+            onChange={handleInputChange}
+            placeholder="Téléphone"
+          />
+          <input
+            type="email"
+            className="form-control mb-2"
+            name="email"
+            value={selectedUser?.email || ''}
+            onChange={handleInputChange}
+            placeholder="Email"
+          />
+          <select
+            className="form-control mb-2"
+            name="role"
+            value={selectedUser?.role || ''}
+            onChange={handleInputChange}
+          >
+            <option value="">Sélectionner un rôle</option>
+            {roles.map((role) => (
+              <option key={role._id} value={role.name}>
+                {role.name}
+              </option>
+            ))}
+          </select>
+          <Button variant="primary" onClick={handleSaveUser} className="mt-3">
+            Save
+          </Button>
+        </Modal.Body>
+      </Modal>
+
+      <Modal show={showDeleteModal} onHide={handleCloseDeleteModal} centered>
+        <Modal.Body className="text-center">
+          <div className="mb-3">
+            <FaTrash size={40} className="text-danger" />
+          </div>
+          <h4 className="text-danger f-w-600">Are You Sure?</h4>
+          <p className="text-secondary f-s-16">You won't be able to revert this!</p>
+          <div className="mt-3">
+            <Button variant="secondary" onClick={handleCloseDeleteModal} className="me-2">
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={handleConfirmDelete}>
+              Delete
+            </Button>
+          </div>
+        </Modal.Body>
+      </Modal>
     </div>
   );
 };
 
-export default UpdateUser;
+export default UserList;

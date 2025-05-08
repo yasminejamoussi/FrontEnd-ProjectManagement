@@ -1,19 +1,20 @@
-import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import axios from "axios";
-import "../../assets/vendor/glightbox/glightbox.min.css";
-import "../../assets/vendor/apexcharts/apexcharts.css";
-import "../../assets/vendor/select/select2.min.css";
-import "../../assets/css/style.css";
-import "../../assets/css/responsive.css";
-import Header from "../Layout/Header";
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import Header from '../Layout/Header';
 import Sidebar from '../Layout/SideBar';
+import '../../assets/vendor/glightbox/glightbox.min.css';
+import '../../assets/vendor/apexcharts/apexcharts.css';
+import '../../assets/vendor/select/select2.min.css';
+import '../../assets/css/style.css';
+import '../../assets/css/responsive.css';
 
 const UpdateUser = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:4000';
 
-  const [user, setUser] = useState({ firstname: "", lastname: "", phone: "", email: "", role: "" });
+  const [user, setUser] = useState({ firstname: '', lastname: '', phone: '', email: '', role: '' });
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -22,53 +23,62 @@ const UpdateUser = () => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const phoneRegex = /^[+]?[\d\s-]{8,15}$/;
 
-  // Récupérer les données de l'utilisateur et les rôles
   useEffect(() => {
-    const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL;
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setError('Vous devez être connecté.');
+      setLoading(false);
+      return;
+    }
 
-    // Récupérer l'utilisateur
-    const fetchUser = axios.get(`${apiBaseUrl}/api/auth/users/${id}`);
-    // Récupérer les rôles
-    const fetchRoles = axios.get(`${apiBaseUrl}/api/roles`); // Assumes an endpoint to list roles
+    // Vérifier que l'id est défini et semble valide
+    if (!id || id === 'undefined') {
+      console.error('ID utilisateur non défini ou invalide:', id);
+      setError('ID utilisateur invalide.');
+      setLoading(false);
+      navigate('/users');
+      return;
+    }
 
-    Promise.all([fetchUser, fetchRoles])
+    Promise.all([
+      axios.get(`${apiBaseUrl}/api/auth/users/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch((err) => {
+        console.error('Erreur lors de la récupération de l\'utilisateur:', err);
+        throw err;
+      }),
+      axios.get(`${apiBaseUrl}/api/roles`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch((err) => {
+        console.error('Erreur lors de la récupération des rôles:', err);
+        throw err;
+      }),
+    ])
       .then(([userResponse, rolesResponse]) => {
         setUser({
           ...userResponse.data,
-          role: userResponse.data.role?.name || "" // Utiliser le nom du rôle
+          role: userResponse.data.role?.name || '',
         });
-        setRoles(rolesResponse.data || []);
+        setRoles(rolesResponse.data);
         setLoading(false);
       })
       .catch((error) => {
-        console.error("Erreur lors du chargement des données:", error);
-        setError("Impossible de charger les données.");
+        console.error('Erreur lors du chargement des données:', error);
+        setError(error.response?.data?.message || 'Impossible de charger les données.');
         setLoading(false);
       });
-  }, [id]);
+  }, [id, navigate, apiBaseUrl]);
 
   const validateForm = () => {
     const errors = {};
 
-    if (!user.firstname.trim()) {
-      errors.firstname = "Le prénom est requis.";
-    }
-    if (!user.lastname.trim()) {
-      errors.lastname = "Le nom est requis.";
-    }
-    if (!user.phone.trim()) {
-      errors.phone = "Le numéro de téléphone est requis.";
-    } else if (!phoneRegex.test(user.phone)) {
-      errors.phone = "Le numéro de téléphone est invalide.";
-    }
-    if (!user.email.trim()) {
-      errors.email = "L'email est requis.";
-    } else if (!emailRegex.test(user.email)) {
-      errors.email = "L'email est invalide.";
-    }
-    if (!user.role) {
-      errors.role = "Le rôle est requis.";
-    }
+    if (!user.firstname.trim()) errors.firstname = 'Le prénom est requis.';
+    if (!user.lastname.trim()) errors.lastname = 'Le nom est requis.';
+    if (!user.phone.trim()) errors.phone = 'Le numéro de téléphone est requis.';
+    else if (!phoneRegex.test(user.phone)) errors.phone = 'Le numéro de téléphone est invalide.';
+    if (!user.email.trim()) errors.email = 'L\'email est requis.';
+    else if (!emailRegex.test(user.email)) errors.email = 'L\'email est invalide.';
+    if (!user.role) errors.role = 'Le rôle est requis.';
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -77,31 +87,28 @@ const UpdateUser = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
 
     try {
-      const token = localStorage.getItem("token");
-      const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL;
+      const token = localStorage.getItem('token');
       const response = await axios.put(
         `${apiBaseUrl}/api/auth/users/${id}`,
         user,
         {
           headers: {
             Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
           },
         }
       );
 
       if (response.status === 200) {
-        alert("Utilisateur mis à jour avec succès !");
-        navigate("/users");
+        alert('Utilisateur mis à jour avec succès !');
+        navigate('/users');
       }
     } catch (error) {
-      console.error("Erreur lors de la mise à jour de l'utilisateur:", error);
-      alert(error.response?.data?.message || "Une erreur est survenue lors de la mise à jour.");
+      console.error('Erreur lors de la mise à jour de l\'utilisateur:', error);
+      alert(error.response?.data?.message || 'Une erreur est survenue lors de la mise à jour.');
     }
   };
 
@@ -166,7 +173,7 @@ const UpdateUser = () => {
                                 alt="instagram-check-mark"
                               />
                             </h5>
-                            <p>{user.role || "Rôle non défini"}</p>
+                            <p>{user.role || 'Rôle non défini'}</p>
                           </div>
                           <form className="app-form" onSubmit={handleSubmit}>
                             <h5 className="mb-2 text-dark f-w-600">User Info</h5>
@@ -258,7 +265,9 @@ const UpdateUser = () => {
                               </div>
                               <div className="col-12">
                                 <div className="text-end">
-                                  <button type="submit" className="btn btn-primary">Submit</button>
+                                  <button type="submit" className="btn btn-primary">
+                                    Submit
+                                  </button>
                                 </div>
                               </div>
                             </div>
@@ -272,11 +281,6 @@ const UpdateUser = () => {
             </div>
           </div>
         </main>
-      </div>
-      <div className="go-top">
-        <span className="progress-value">
-          <i className="ti ti-arrow-up"></i>
-        </span>
       </div>
     </div>
   );
