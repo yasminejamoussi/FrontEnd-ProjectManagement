@@ -7,7 +7,7 @@ import "../../assets/vendor/select/select2.min.css";
 import "../../assets/css/style.css";
 import "../../assets/css/responsive.css";
 import Header from "../Layout/Header";
-import SideBar from "../Layout/SideBar";
+import Sidebar from '../Layout/SideBar';
 
 const UpdateUser = () => {
   const { id } = useParams(); // Récupérer l'ID de l'utilisateur depuis l'URL
@@ -25,8 +25,9 @@ const UpdateUser = () => {
 
   // Récupération des données de l'utilisateur spécifique
   useEffect(() => {
+    const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL;
     axios
-      .get(`http://localhost:4000/api/auth/users/${id}`) // Récupère l'utilisateur spécifique
+       .get(`${apiBaseUrl}/api/auth/users/${id}`) // Récupère l'utilisateur spécifique
       .then((response) => {
         setUser(response.data); // Mettre à jour l'état avec les données reçues
         setLoading(false);
@@ -73,10 +74,10 @@ const UpdateUser = () => {
 
     try {
       const token = localStorage.getItem("token"); // Récupérer le token d'authentification
-
+      const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL;
       // Requête PUT pour mettre à jour l'utilisateur
       const response = await axios.put(
-        `http://localhost:4000/api/auth/users/${id}`,
+        `${apiBaseUrl}/api/auth/users/${id}`,
         user,
         {
           headers: {

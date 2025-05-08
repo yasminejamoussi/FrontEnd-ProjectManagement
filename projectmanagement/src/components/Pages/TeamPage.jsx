@@ -4,7 +4,7 @@ import { jwtDecode } from "jwt-decode";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import Header from "../Layout/Header";
-import Sidebar from "../Layout/Sidebar";
+import Sidebar from '../Layout/SideBar';
 import "../../assets/css/Team.css";
 import DefaultAvatar from "../../assets/images/avtar/user.jpg";
 import TaskMasterBadge from "../../assets/images/badges/coordinateur.png";
