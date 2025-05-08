@@ -1,11 +1,48 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { NavLink } from 'react-router-dom';
 import axios from 'axios';
+import { jwtDecode } from "jwt-decode";
 import Header from "../Layout/Header";
 import Sidebar from '../Layout/SideBar';
 import user from '../../assets/images/avtar/user.jpg';
-import { jwtDecode } from "jwt-decode";
+
+// Lazy load components for better performance
+const Modal = lazy(() => import('react-bootstrap/Modal'));
+const Button = lazy(() => import('react-bootstrap/Button'));
+
+// Configure Axios with base URL from environment variable
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL ;
+const axiosInstance = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Add request interceptor to include JWT token
+axiosInstance.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Add response interceptor for handling token expiration
+axiosInstance.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
 
 const ProjectsDashboard = () => {
   const [projects, setProjects] = useState([]);
@@ -16,7 +53,7 @@ const ProjectsDashboard = () => {
   const [success, setSuccess] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [users, setUsers] = useState([]);
-  const [userRole, setUserRole] = useState(null);
+  const [userRole, setUserRole] = useState('Guest');
   const [userId, setUserId] = useState(null);
   const [editingProject, setEditingProject] = useState(null);
   const [filters, setFilters] = useState({ status: '', projectManager: '', startDate: '', endDate: '' });
@@ -48,50 +85,46 @@ const ProjectsDashboard = () => {
     const fetchData = async () => {
       setLoading(true);
       const jwtToken = localStorage.getItem("token");
-      let userRole = 'Guest';
-      let userId = null;
 
-      if (jwtToken) {
-        const decoded = jwtDecode(jwtToken);
-        userRole = decoded?.role || 'Guest';
-        userId = decoded?.id;
-        setUserRole(userRole);
-        setUserId(userId);
+      if (!jwtToken) {
+        window.location.href = '/login';
+        return;
       }
 
       try {
+        const decoded = jwtDecode(jwtToken);
+        const role = decoded?.role || 'Guest';
+        const id = decoded?.id;
+        setUserRole(role);
+        setUserId(id);
+
         const [projectsResponse, usersResponse] = await Promise.all([
-          axios.get("http://localhost:4000/api/projects", {
-            headers: { Authorization: `Bearer ${jwtToken}` },
-            params: { ...filters, ...sort }
-          }),
-          axios.get("http://localhost:4000/api/auth/users", {
-            headers: { Authorization: `Bearer ${jwtToken}` }
-          }),
+          axiosInstance.get('/api/projects', { params: { ...filters, ...sort } }),
+          axiosInstance.get('/api/auth/users'),
         ]);
 
         const allProjects = projectsResponse.data || [];
         const allUsers = usersResponse.data || [];
 
         let filteredProjects = allProjects;
-        if (userRole === 'Project Manager') {
+        if (role === 'Project Manager') {
           filteredProjects = allProjects.filter(
-            (project) => project.projectManager?._id === userId
+            (project) => project.projectManager?._id === id
           );
-        } else if (userRole === 'Team Leader' || userRole === 'Team Member') {
+        } else if (role === 'Team Leader' || role === 'Team Member') {
           filteredProjects = allProjects.filter(
             (project) =>
-              project.projectManager?._id === userId ||
-              project.teamMembers?.some((member) => member._id === userId)
+              project.projectManager?._id === id ||
+              project.teamMembers?.some((member) => member._id === id)
           );
-        } else if (userRole === 'Guest') {
+        } else if (role === 'Guest') {
           filteredProjects = [];
         }
 
         setProjects(filteredProjects);
         setUsers(allUsers);
       } catch (error) {
-        setFormErrors({ general: " Failed to fetch data - " + (error.response?.data?.message || error.message) });
+        setFormErrors({ general: `Failed to fetch data: ${error.response?.data?.message || error.message}` });
       } finally {
         setLoading(false);
       }
@@ -116,16 +149,12 @@ const ProjectsDashboard = () => {
     setFormErrors({});
     setSuccess(null);
     try {
-      const response = await axios.post("http://localhost:4000/api/projects", projectData, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-      });
+      const response = await axiosInstance.post('/api/projects', projectData);
       setProjects([...projects, response.data.project]);
-      setSuccess("Success: Project added successfully!");
+      setSuccess('Project added successfully!');
       setShowModal(false);
     } catch (error) {
-      const errorMessage = error.response?.data?.error || error.message;
-      setFormErrors({ general: ` Failed to add project - ${errorMessage}` });
-      console.error("Error adding project:", errorMessage);
+      setFormErrors({ general: `Failed to add project: ${error.response?.data?.error || error.message}` });
     } finally {
       setIsSubmitting(false);
     }
@@ -133,7 +162,7 @@ const ProjectsDashboard = () => {
 
   const suggestPriorityWithIA = async () => {
     if (!newTask.title) {
-      setFormErrors({ taskTitle: " Please enter a task title before requesting an AI suggestion." });
+      setFormErrors({ taskTitle: 'Please enter a task title before requesting an AI suggestion.' });
       return;
     }
 
@@ -141,17 +170,15 @@ const ProjectsDashboard = () => {
     setFormErrors(prev => ({ ...prev, taskPriority: '' }));
 
     try {
-      const response = await axios.post('http://localhost:4000/api/prioritize', {
+      const response = await axiosInstance.post('/api/prioritize', {
         title: newTask.title,
         description: newTask.description || '',
-      }, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
       });
       const { priority } = response.data;
       setNewTask(prev => ({ ...prev, priority }));
-      setSuccess("Success: AI suggested priority - " + priority);
-    } catch (err) {
-      setFormErrors({ taskPriority: " Failed to suggest priority - " + (err.response?.data?.error || err.message) });
+      setSuccess(`AI suggested priority: ${priority}`);
+    } catch (error) {
+      setFormErrors({ taskPriority: `Failed to suggest priority: ${error.response?.data?.error || error.message}` });
     } finally {
       setIsSuggestingPriority(false);
     }
@@ -175,9 +202,9 @@ const ProjectsDashboard = () => {
     const selected = Array.from(e.target.selectedOptions, option => option.value);
     const teamLeaders = users.filter(user => user.role?.name === 'Team Leader').map(user => user._id);
     const selectedTeamLeaders = selected.filter(id => teamLeaders.includes(id));
-    
+
     if (selectedTeamLeaders.length > 1) {
-      setFormErrors(prev => ({ ...prev, team: " You can only select one Team Leader." }));
+      setFormErrors(prev => ({ ...prev, team: 'You can only select one Team Leader.' }));
       return;
     }
 
@@ -190,35 +217,33 @@ const ProjectsDashboard = () => {
     setFormErrors({});
     setSuccess(null);
     try {
-      const response = await axios.put(`http://localhost:4000/api/projects/${editingProject._id}`, projectData, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-      });
+      const response = await axiosInstance.put(`/api/projects/${editingProject._id}`, projectData);
       setProjects(projects.map(project => project._id === editingProject._id ? response.data : project));
-      setSuccess("Success: Project updated successfully!");
+      setSuccess('Project updated successfully!');
       setShowModal(false);
       setEditingProject(null);
     } catch (error) {
-      setFormErrors({ general: " Failed to update project - " + (error.response?.data?.error || error.message) });
+      setFormErrors({ general: `Failed to update project: ${error.response?.data?.error || error.message}` });
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const suggestUsersBasedOnDeliverables = async (deliverables) => {
-    if (!deliverables || deliverables.trim() === "") {
+    if (!deliverables || deliverables.trim() === '') {
       setSuggestedUsers([]);
       setFormErrors(prev => ({ ...prev, deliverables: '' }));
       return;
     }
-  
+
     setIsSuggestingUsers(true);
     setSuggestedUsers([]);
     setFormErrors(prev => ({ ...prev, deliverables: '' }));
-  
+
     try {
       const tempProjectData = {
-        name: "Temp Project",
-        description: "Temporary project for skill extraction",
+        name: 'Temp Project',
+        description: 'Temporary project for skill extraction',
         startDate: new Date().toISOString().split('T')[0],
         endDate: new Date().toISOString().split('T')[0],
         deliverables: deliverables.split(',').map(item => item.trim()).filter(item => item),
@@ -227,25 +252,18 @@ const ProjectsDashboard = () => {
         teamMembers: [],
         tasks: [],
       };
-  
-      const response = await axios.post("http://localhost:4000/api/projects", tempProjectData, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-      });
+
+      const response = await axiosInstance.post('/api/projects', tempProjectData);
       const projectId = response.data.project._id;
-  
-      const matchResponse = await axios.get(`http://localhost:4000/api/projects/${projectId}/match-users`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-      });
-  
+
+      const matchResponse = await axiosInstance.get(`/api/projects/${projectId}/match-users`);
       setSuggestedUsers(matchResponse.data.matchedUsers || []);
-  
-      await axios.delete(`http://localhost:4000/api/projects/${projectId}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-      });
+
+      await axiosInstance.delete(`/api/projects/${projectId}`);
     } catch (error) {
       setFormErrors(prev => ({
         ...prev,
-        deliverables: " Failed to suggest users - " + (error.response?.data?.message || error.message)
+        deliverables: `Failed to suggest users: ${error.response?.data?.message || error.message}`,
       }));
       setSuggestedUsers([]);
     } finally {
@@ -278,25 +296,24 @@ const ProjectsDashboard = () => {
       objectives: e.target.objectives.value.split(',').map(item => item.trim()).filter(item => item),
       tasks: taskList,
     };
-  
+
     if (!editingProject) {
       projectData.projectManager = userId;
     }
-  
-    // Validation checks
+
     if (!projectData.name) {
-      setFormErrors(prev => ({ ...prev, general: "Project name is required." }));
+      setFormErrors(prev => ({ ...prev, general: 'Project name is required.' }));
       return;
     }
     if (!projectData.startDate || !projectData.endDate) {
-      setFormErrors(prev => ({ ...prev, general: "Start date and end date are required." }));
+      setFormErrors(prev => ({ ...prev, general: 'Start date and end date are required.' }));
       return;
     }
     if (new Date(projectData.endDate) < new Date(projectData.startDate)) {
-      setFormErrors(prev => ({ ...prev, endDate: "The end date must be after the start date." }));
+      setFormErrors(prev => ({ ...prev, endDate: 'The end date must be after the start date.' }));
       return;
     }
-  
+
     if (editingProject) {
       handleUpdateProject(projectData);
     } else {
@@ -308,13 +325,11 @@ const ProjectsDashboard = () => {
 
   const handleDeleteProject = async (projectId) => {
     try {
-      await axios.delete(`http://localhost:4000/api/projects/${projectId}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-      });
+      await axiosInstance.delete(`/api/projects/${projectId}`);
       setProjects(projects.filter(project => project._id !== projectId));
-      setSuccess("Success: Project deleted successfully!");
+      setSuccess('Project deleted successfully!');
     } catch (error) {
-      setFormErrors({ general: " Failed to delete project  " + (error.response?.data?.message || error.message) });
+      setFormErrors({ general: `Failed to delete project: ${error.response?.data?.message || error.message}` });
     }
   };
 
@@ -322,10 +337,10 @@ const ProjectsDashboard = () => {
     if (newTask.title.trim()) {
       const newFieldErrors = {};
       if (newTask.startDate && projectStartDate && new Date(newTask.startDate) < new Date(projectStartDate)) {
-        newFieldErrors.startDate = "Error: The task cannot start before the project.";
+        newFieldErrors.startDate = 'The task cannot start before the project.';
       }
       if (newTask.dueDate && newTask.startDate && new Date(newTask.dueDate) < new Date(newTask.startDate)) {
-        newFieldErrors.dueDate = "Error: The task's due date cannot be earlier than the start date.";
+        newFieldErrors.dueDate = 'The task’s due date cannot be earlier than the start date.';
       }
 
       if (Object.keys(newFieldErrors).length > 0) {
@@ -344,7 +359,7 @@ const ProjectsDashboard = () => {
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('fr-FR');
+    return new Date(dateString).toLocaleDateString('fr-FR', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
   const suggestEndDate = async () => {
@@ -352,38 +367,44 @@ const ProjectsDashboard = () => {
       const projectData = {
         startDate: projectStartDate,
         tasks: taskList,
-        teamMembers: Array.from(document.getElementById("team").selectedOptions).map(option => option.value)
+        teamMembers: Array.from(document.getElementById('team').selectedOptions).map(option => option.value),
       };
 
-      const response = await axios.post("http://localhost:4000/api/projects/predict", projectData, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-      });
+      const response = await axiosInstance.post('/api/projects/predict', projectData);
       const endDate = new Date(response.data.predictedEndDate);
-      setProjectEndDate(endDate.toISOString().split("T")[0]);
+      setProjectEndDate(endDate.toISOString().split('T')[0]);
       setPredictedDuration(response.data.predictedDuration);
       if (projectStartDate && new Date(endDate) >= new Date(projectStartDate)) {
         setFormErrors(prev => ({ ...prev, endDate: '' }));
       }
     } catch (error) {
-      setFormErrors({ endDate: " Failed to predict end date " });
+      setFormErrors({ endDate: 'Failed to predict end date.' });
     }
   };
 
   const getStatusBadgeClass = (status) => {
     switch (status.toLowerCase()) {
-      case "pending": return "bg-warning";
-      case "in progress": return "bg-primary";
-      case "completed": return "bg-success";
-      default: return "bg-secondary";
+      case 'pending':
+        return 'bg-warning';
+      case 'in progress':
+        return 'bg-primary';
+      case 'completed':
+        return 'bg-success';
+      default:
+        return 'bg-secondary';
     }
   };
 
   const getProgressPercentage = (status) => {
     switch (status.toLowerCase()) {
-      case "pending": return 5;
-      case "in progress": return 50;
-      case "completed": return 100;
-      default: return 0;
+      case 'pending':
+        return 5;
+      case 'in progress':
+        return 50;
+      case 'completed':
+        return 100;
+      default:
+        return 0;
     }
   };
 
@@ -425,7 +446,15 @@ const ProjectsDashboard = () => {
     setShowModal(true);
   };
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-wrapper" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
@@ -438,10 +467,10 @@ const ProjectsDashboard = () => {
       <div className="app-content" style={{ flex: 1 }}>
         <main>
           <div className="container-fluid">
-            <br></br>
+            <br />
             <div className="d-flex justify-content-between align-items-center mb-4">
               <h4 className="section-title f-w-700">Projects</h4>
-              {(userRole === "Admin" || userRole === "Project Manager") && (
+              {(userRole === 'Admin' || userRole === 'Project Manager') && (
                 <button
                   id="newProject"
                   type="button"
@@ -461,7 +490,9 @@ const ProjectsDashboard = () => {
                   <h5 style={{ color: '#34495e', marginBottom: '15px' }}>Filters</h5>
                   <form className="d-flex flex-wrap gap-3 align-items-end">
                     <div className="form-group">
-                      <label htmlFor="filterStatus" className="form-label" style={{ color: '#7f8c8d' }}>Status</label>
+                      <label htmlFor="filterStatus" className="form-label" style={{ color: '#7f8c8d' }}>
+                        Status
+                      </label>
                       <select
                         id="filterStatus"
                         name="status"
@@ -478,7 +509,9 @@ const ProjectsDashboard = () => {
                       </select>
                     </div>
                     <div className="form-group">
-                      <label htmlFor="filterProjectManager" className="form-label" style={{ color: '#7f8c8d' }}>Project Manager</label>
+                      <label htmlFor="filterProjectManager" className="form-label" style={{ color: '#7f8c8d' }}>
+                        Project Manager
+                      </label>
                       <select
                         id="filterProjectManager"
                         name="projectManager"
@@ -489,13 +522,19 @@ const ProjectsDashboard = () => {
                         aria-label="Filter by project manager"
                       >
                         <option value="">All managers</option>
-                        {users.filter(u => ["Project Manager", "Admin"].includes(u.role?.name)).map(user => (
-                          <option key={user._id} value={user._id}>{user.firstname} {user.lastname}</option>
-                        ))}
+                        {users
+                          .filter(u => ['Project Manager', 'Admin'].includes(u.role?.name))
+                          .map(user => (
+                            <option key={user._id} value={user._id}>
+                              {user.firstname} {user.lastname}
+                            </option>
+                          ))}
                       </select>
                     </div>
                     <div className="form-group">
-                      <label htmlFor="filterStartDate" className="form-label" style={{ color: '#7f8c8d' }}>Start Date</label>
+                      <label htmlFor="filterStartDate" className="form-label" style={{ color: '#7f8c8d' }}>
+                        Start Date
+                      </label>
                       <input
                         id="filterStartDate"
                         type="date"
@@ -508,7 +547,9 @@ const ProjectsDashboard = () => {
                       />
                     </div>
                     <div className="form-group">
-                      <label htmlFor="filterEndDate" className="form-label" style={{ color: '#7f8c8d' }}>End Date</label>
+                      <label htmlFor="filterEndDate" className="form-label" style={{ color: '#7f8c8d' }}>
+                        End Date
+                      </label>
                       <input
                         id="filterEndDate"
                         type="date"
@@ -521,7 +562,9 @@ const ProjectsDashboard = () => {
                       />
                     </div>
                     <div className="form-group">
-                      <label htmlFor="sortBy" className="form-label" style={{ color: '#7f8c8d' }}>Sort By</label>
+                      <label htmlFor="sortBy" className="form-label" style={{ color: '#7f8c8d' }}>
+                        Sort By
+                      </label>
                       <select
                         id="sortBy"
                         name="sortBy"
@@ -538,7 +581,9 @@ const ProjectsDashboard = () => {
                       </select>
                     </div>
                     <div className="form-group">
-                      <label htmlFor="sortOrder" className="form-label" style={{ color: '#7f8c8d' }}>Order</label>
+                      <label htmlFor="sortOrder" className="form-label" style={{ color: '#7f8c8d' }}>
+                        Order
+                      </label>
                       <select
                         id="sortOrder"
                         name="order"
@@ -558,7 +603,12 @@ const ProjectsDashboard = () => {
             </div>
 
             <div className="row" id="card-container">
-              {projects.map((project) => {
+              {projects.length === 0 && !loading && (
+                <div className="col-12 text-center">
+                  <p className="text-muted">No projects found.</p>
+                </div>
+              )}
+              {projects.map(project => {
                 const projectManager = users.find(user => user._id === project.projectManager?._id);
                 return (
                   <div key={project._id} className="col-md-6 col-xl-4 project-card">
@@ -586,7 +636,7 @@ const ProjectsDashboard = () => {
                           <NavLink to={`/project-details/${project._id}`} className="flex-grow-1 ps-2">
                             <h6 className="m-0 text-dark f-w-600">{project.name}</h6>
                           </NavLink>
-                          {(userRole === "Admin" || userRole === "Project Manager") && (
+                          {(userRole === 'Admin' || userRole === 'Project Manager') && (
                             <div className="dropdown">
                               <button className="bg-none border-0" type="button" data-bs-toggle="dropdown">
                                 <i className="ti ti-dots-vertical text-dark"></i>
@@ -618,8 +668,12 @@ const ProjectsDashboard = () => {
                       <div className="card-body">
                         <div className="d-flex">
                           <div>
-                            <h6 className="text-dark f-s-14">Start: <span className="text-success">{formatDate(project.startDate)}</span></h6>
-                            <h6 className="text-dark f-s-14">End: <span className="text-danger">{formatDate(project.endDate)}</span></h6>
+                            <h6 className="text-dark f-s-14">
+                              Start: <span className="text-success">{formatDate(project.startDate)}</span>
+                            </h6>
+                            <h6 className="text-dark f-s-14">
+                              End: <span className="text-danger">{formatDate(project.endDate)}</span>
+                            </h6>
                           </div>
                         </div>
                         <p className="text-muted f-s-14 text-secondary txt-ellipsis-2">{project.description}</p>
@@ -630,7 +684,7 @@ const ProjectsDashboard = () => {
                         </div>
                         <div className="progress w-100" role="progressbar">
                           <div
-                            className={`progress-bar bg-${project.status === "Completed" ? 'success' : 'primary'}`}
+                            className={`progress-bar bg-${project.status === 'Completed' ? 'success' : 'primary'}`}
                             style={{ width: `${getProgressPercentage(project.status)}%` }}
                           >
                             {getProgressPercentage(project.status)}%
@@ -648,16 +702,10 @@ const ProjectsDashboard = () => {
                             </span>
                           </div>
                           <div className="col-6 d-flex justify-content-end gap-2">
-                            <NavLink
-                              to={`/project-details/${project._id}`}
-                              className="btn btn-outline-primary btn-sm"
-                            >
+                            <NavLink to={`/project-details/${project._id}`} className="btn btn-outline-primary btn-sm">
                               <i className="ti ti-eye f-s-16"></i> Details
                             </NavLink>
-                            <NavLink
-                              to={`/kanban/${project._id}`}
-                              className="btn btn-outline-info btn-sm"
-                            >
+                            <NavLink to={`/kanban/${project._id}`} className="btn btn-outline-info btn-sm">
                               <i className="ti ti-list f-s-16"></i> View tasks
                             </NavLink>
                           </div>
@@ -671,322 +719,329 @@ const ProjectsDashboard = () => {
           </div>
         </main>
       </div>
+
       {showModal && (
-        <>
-          <div className="modal fade show" style={{ display: 'block', zIndex: 1150 }}>
-            <div className="modal-dialog modal-lg">
-              <div className="modal-content">
-                <div className="modal-header">
-                  <h1 className="modal-title fs-5">{editingProject ? "Edit a project" : "Add a new project"}</h1>
-                  <button
-                    type="button"
-                    className="btn-close"
-                    onClick={() => {
-                      setShowModal(false);
-                      resetModalState();
-                    }}
+        <Suspense fallback={<div>Loading modal...</div>}>
+          <Modal show={showModal} onHide={() => setShowModal(false)} size="lg" centered>
+            <Modal.Header closeButton>
+              <Modal.Title>{editingProject ? 'Edit a project' : 'Add a new project'}</Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+              <form className="app-form" onSubmit={handleSubmit}>
+                <div className="mb-3">
+                  <label htmlFor="pName" className="form-label">
+                    Project name
+                  </label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    id="pName"
+                    defaultValue={editingProject?.name || ''}
+                    required
                   />
                 </div>
-                <div className="modal-body">
-                  <form className="app-form" onSubmit={handleSubmit}>
-                    <div className="mb-3">
-                      <label htmlFor="pName" className="form-label">Project name</label>
-                      <input type="text" className="form-control" id="pName" defaultValue={editingProject?.name || ""} required />
+                <div className="mb-3">
+                  <label className="form-label">Start date</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    id="startDate"
+                    name="startDate"
+                    value={projectStartDate}
+                    onChange={handleDateChange}
+                    required
+                  />
+                </div>
+                <div className="mb-3">
+                  <label className="form-label">End date</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    id="endDate"
+                    name="endDate"
+                    value={projectEndDate}
+                    onChange={handleDateChange}
+                    required
+                  />
+                  {formErrors.endDate && <div className="text-danger mt-1">{formErrors.endDate}</div>}
+                  <div className="mb-3 text-center">
+                    <Button variant="primary" onClick={suggestEndDate} className="mt-2">
+                      Suggest a date
+                    </Button>
+                    {predictedDuration && (
+                      <p className="mt-2 text-muted">Estimated duration: {predictedDuration} Days</p>
+                    )}
+                  </div>
+                </div>
+                <div className="mb-3">
+                  <label htmlFor="projectDescription" className="form-label">
+                    Description
+                  </label>
+                  <textarea
+                    className="form-control"
+                    rows="5"
+                    id="projectDescription"
+                    defaultValue={editingProject?.description || ''}
+                  />
+                </div>
+                <div className="mb-3">
+                  <label htmlFor="deliverables" className="form-label">
+                    Deliverables
+                  </label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    id="deliverables"
+                    defaultValue={editingProject?.deliverables?.join(', ') || ''}
+                    placeholder="Separated by commas"
+                    onBlur={e => {
+                      if (e.target.value) {
+                        suggestUsersBasedOnDeliverables(e.target.value);
+                      } else {
+                        setSuggestedUsers([]);
+                        setFormErrors(prev => ({ ...prev, deliverables: '' }));
+                      }
+                    }}
+                  />
+                  {formErrors.deliverables && <div className="text-danger mt-1">{formErrors.deliverables}</div>}
+                </div>
+                {isSuggestingUsers && (
+                  <div className="mb-3">
+                    <p className="text-muted">Loading suggestions...</p>
+                  </div>
+                )}
+                {suggestedUsers.length > 0 && (
+                  <div className="mb-3">
+                    <h5>Suggested Users</h5>
+                    <ul className="list-group">
+                      {suggestedUsers.map(user => (
+                        <li key={user.id} className="list-group-item">
+                          <div className="d-flex justify-content-between align-items-center">
+                            <div>
+                              <strong>
+                                {user.firstname} {user.lastname}
+                              </strong>{' '}
+                              ({user.role})<br />
+                              <small>Skills: {user.skills.join(', ')}</small>
+                              <br />
+                              <small>Corresponding skills: {user.commonSkills.join(', ')}</small>
+                              <br />
+                              <small>Assigned tasks: {user.taskCount}</small>
+                            </div>
+                            <div>
+                              <span className="badge bg-success">Score: {user.score}%</span>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <div className="mb-3">
+                  <label htmlFor="team" className="form-label">
+                    Team project
+                  </label>
+                  <select
+                    className="form-control"
+                    id="team"
+                    multiple
+                    defaultValue={editingProject?.teamMembers.map(member => member._id || member) || []}
+                    style={{ height: '150px' }}
+                    onChange={handleTeamSelectionChange}
+                  >
+                    {users
+                      .filter(user => ['Team Leader', 'Team Member'].includes(user.role?.name))
+                      .sort((a, b) => {
+                        const aProjects = a.managedProjects ? a.managedProjects.length : 0;
+                        const bProjects = b.managedProjects ? b.managedProjects.length : 0;
+                        return aProjects - bProjects;
+                      })
+                      .map(user => (
+                        <option key={user._id} value={user._id}>
+                          {user.firstname} {user.lastname} ({user.role?.name || 'Role not defined'}) - Projects:{' '}
+                          {user.managedProjects ? user.managedProjects.length : 0}
+                        </option>
+                      ))}
+                  </select>
+                  {formErrors.team && <div className="text-danger mt-1">{formErrors.team}</div>}
+                </div>
+                <div className="mb-3">
+                  <label htmlFor="objectives" className="form-label">
+                    Objectives
+                  </label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    id="objectives"
+                    defaultValue={editingProject?.objectives?.join(', ') || ''}
+                    placeholder="Separated by commas"
+                  />
+                </div>
+                <div className="mb-3">
+                  <h5>Add tasks</h5>
+                  <div className="row">
+                    <div className="col-md-4">
+                      <label className="form-label">Title</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={newTask.title}
+                        name="title"
+                        onChange={handleTaskInputChange}
+                      />
+                      {formErrors.taskTitle && <div className="text-danger mt-1">{formErrors.taskTitle}</div>}
                     </div>
-                    <div className="mb-3">
+                    <div className="col-md-4">
+                      <label className="form-label">Status</label>
+                      <select
+                        className="form-control"
+                        value={newTask.status}
+                        onChange={e => setNewTask({ ...newTask, status: e.target.value })}
+                      >
+                        <option value="To Do">To Do</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Review">Review</option>
+                        <option value="Done">Done</option>
+                        <option value="Tested">Tested</option>
+                      </select>
+                    </div>
+                    <div className="col-md-4">
+                      <label className="form-label">Priority</label>
+                      <select
+                        className="form-control"
+                        value={newTask.priority}
+                        onChange={e => setNewTask({ ...newTask, priority: e.target.value })}
+                      >
+                        <option value="Low">Low</option>
+                        <option value="Medium">Medium</option>
+                        <option value="High">High</option>
+                        <option value="Urgent">Urgent</option>
+                      </select>
+                      {formErrors.taskPriority && <div className="text-danger mt-1">{formErrors.taskPriority}</div>}
+                    </div>
+                  </div>
+                  <div className="row mt-2">
+                    <div className="col-md-4">
                       <label className="form-label">Start date</label>
                       <input
                         type="date"
                         className="form-control"
-                        id="startDate"
+                        value={newTask.startDate}
+                        onChange={handleTaskInputChange}
                         name="startDate"
-                        value={projectStartDate}
-                        onChange={handleDateChange}
-                        required
+                        min={projectStartDate}
                       />
+                      {fieldErrors.startDate && <div className="text-danger mt-1">{fieldErrors.startDate}</div>}
                     </div>
-                    <div className="mb-3">
-                      <label className="form-label">End date</label>
+                    <div className="col-md-4">
+                      <label className="form-label">Deadline</label>
                       <input
                         type="date"
                         className="form-control"
-                        id="endDate"
-                        name="endDate"
-                        value={projectEndDate}
-                        onChange={handleDateChange}
-                        required
+                        value={newTask.dueDate}
+                        onChange={handleTaskInputChange}
+                        name="dueDate"
                       />
-                      {formErrors.endDate && <div className="text-danger mt-1">{formErrors.endDate}</div>}
-                      <div className="mb-3">
-                        <div className='text-center'>
-                          <button type="button" className="btn btn-primary mt-2" onClick={suggestEndDate}>
-                            Suggest a date
-                          </button>
-                          {predictedDuration && (
-                            <p className="mt-2 text-muted">Estimated duration: {predictedDuration} Days</p>
-                          )}
-                        </div>
-                      </div>
+                      {fieldErrors.dueDate && <div className="text-danger mt-1">{fieldErrors.dueDate}</div>}
                     </div>
-                    <div className="mb-3">
-                      <label htmlFor="projectDescription" className="form-label">Description</label>
-                      <textarea className="form-control" rows="5" id="projectDescription" defaultValue={editingProject?.description || ""} />
-                    </div>
-                    <div className="mb-3">
-                      <label htmlFor="deliverables" className="form-label">Deliverables</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        id="deliverables"
-                        defaultValue={editingProject?.deliverables?.join(', ') || ""}
-                        placeholder="Separated by commas"
-                        onBlur={(e) => {
-                          if (e.target.value) {
-                            suggestUsersBasedOnDeliverables(e.target.value);
-                          } else {
-                            setSuggestedUsers([]);
-                            setFormErrors(prev => ({ ...prev, deliverables: '' }));
-                          }
-                        }}
-                      />
-                      {formErrors.deliverables && <div className="text-danger mt-1">{formErrors.deliverables}</div>}
-                    </div>
-                    {isSuggestingUsers && (
-                      <div className="mb-3">
-                        <p className="text-muted">Loading suggestions...</p>
-                      </div>
-                    )}
-                    {suggestedUsers.length > 0 && (
-                      <div className="mb-3">
-                        <h5>Suggested Users</h5>
-                        <ul className="list-group">
-                          {suggestedUsers.map(user => (
-                            <li key={user.id} className="list-group-item">
-                              <div className="d-flex justify-content-between align-items-center">
-                                <div>
-                                  <strong>{user.firstname} {user.lastname}</strong> ({user.role})<br />
-                                  <small>Skills: {user.skills.join(', ')}</small><br />
-                                  <small>Corresponding skills: {user.commonSkills.join(', ')}</small><br />
-                                  <small>Assigned tasks: {user.taskCount}</small>
-                                </div>
-                                <div>
-                                  <span className="badge bg-success">Score: {user.score}%</span>
-                                </div>
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    <div className="mb-3">
-                      <label htmlFor="team" className="form-label">Team project</label>
+                    <div className="col-md-4">
+                      <label className="form-label">Assigned to</label>
                       <select
                         className="form-control"
-                        id="team"
                         multiple
-                        defaultValue={editingProject?.teamMembers.map(member => member._id || member) || []}
-                        style={{ height: '150px' }}
-                        onChange={handleTeamSelectionChange}
-                      >
-                        {users
-                          .filter(user => ["Team Leader", "Team Member"].includes(user.role?.name))
-                          .sort((a, b) => {
-                            const aProjects = a.managedProjects ? a.managedProjects.length : 0;
-                            const bProjects = b.managedProjects ? b.managedProjects.length : 0;
-                            return aProjects - bProjects; // Ascending order: fewer projects first
+                        value={newTask.assignedTo}
+                        onChange={e =>
+                          setNewTask({
+                            ...newTask,
+                            assignedTo: Array.from(e.target.selectedOptions).map(opt => opt.value),
                           })
-                          .map(user => (
-                            <option key={user._id} value={user._id}>
-                              {user.firstname} {user.lastname} ({user.role?.name || "Role not defined"}) - Projects: {user.managedProjects ? user.managedProjects.length : 0}
-                            </option>
-                          ))}
+                        }
+                        style={{ height: '100px' }}
+                      >
+                        {selectedTeamMembers.length > 0 ? (
+                          users
+                            .filter(user => selectedTeamMembers.includes(user._id) && user.role?.name === 'Team Member')
+                            .map(user => (
+                              <option key={user._id} value={user._id}>
+                                {user.firstname} {user.lastname} ({user.role?.name || 'Role not defined'})
+                              </option>
+                            ))
+                        ) : (
+                          <option disabled>No team members selected</option>
+                        )}
                       </select>
-                      {formErrors.team && <div className="text-danger mt-1">{formErrors.team}</div>}
                     </div>
-                    <div className="mb-3">
-                      <label htmlFor="objectives" className="form-label">Objectives</label>
-                      <input
-                        type="text"
+                  </div>
+                  <div className="row mt-2">
+                    <div className="col-md-12">
+                      <label className="form-label">Description</label>
+                      <textarea
                         className="form-control"
-                        id="objectives"
-                        defaultValue={editingProject?.objectives?.join(', ') || ""}
-                        placeholder="Separated by commas"
+                        value={newTask.description}
+                        onChange={e => setNewTask({ ...newTask, description: e.target.value })}
                       />
                     </div>
-                    <div className="mb-3">
-                      <h5>Add tasks</h5>
-                      <div className="row">
-                        <div className="col-md-4">
-                          <label className="form-label">Title</label>
-                          <input
-                            type="text"
-                            className="form-control"
-                            value={newTask.title}
-                            name="title"
-                            onChange={handleTaskInputChange}
-                          />
-                          {formErrors.taskTitle && <div className="text-danger mt-1">{formErrors.taskTitle}</div>}
-                        </div>
-                        <div className="col-md-4">
-                          <label className="form-label">Status</label>
-                          <select
-                            className="form-control"
-                            value={newTask.status}
-                            onChange={(e) => setNewTask({ ...newTask, status: e.target.value })}
-                          >
-                            <option value="To Do">To Do</option>
-                            <option value="In Progress">In Progress</option>
-                            <option value="Review">Review</option>
-                            <option value="Done">Done</option>
-                            <option value="Tested">Tested</option>
-                          </select>
-                        </div>
-                        <div className="col-md-4">
-                          <label className="form-label">Priority</label>
-                          <select
-                            className="form-control"
-                            value={newTask.priority}
-                            onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
-                          >
-                            <option value="Low">Low</option>
-                            <option value="Medium">Medium</option>
-                            <option value="High">High</option>
-                            <option value="Urgent">Urgent</option>
-                          </select>
-                          {formErrors.taskPriority && <div className="text-danger mt-1">{formErrors.taskPriority}</div>}
-                        </div>
-                      </div>
-                      <div className="row mt-2">
-                        <div className="col-md-4">
-                          <label className="form-label">Start date</label>
-                          <input
-                            type="date"
-                            className="form-control"
-                            value={newTask.startDate}
-                            onChange={handleTaskInputChange}
-                            name="startDate"
-                            min={projectStartDate}
-                          />
-                          {fieldErrors.startDate && <div className="text-danger mt-1">{fieldErrors.startDate}</div>}
-                        </div>
-                        <div className="col-md-4">
-                          <label className="form-label">Deadline</label>
-                          <input
-                            type="date"
-                            className="form-control"
-                            value={newTask.dueDate}
-                            onChange={handleTaskInputChange}
-                            name="dueDate"
-                          />
-                          {fieldErrors.dueDate && <div className="text-danger mt-1">{fieldErrors.dueDate}</div>}
-                        </div>
-                        <div className="col-md-4">
-                          <label className="form-label">Assigned to</label>
-                          <select
-                            className="form-control"
-                            multiple
-                            value={newTask.assignedTo}
-                            onChange={(e) => setNewTask({ ...newTask, assignedTo: Array.from(e.target.selectedOptions).map(opt => opt.value) })}
-                            style={{ height: '100px' }}
-                          >
-                            {selectedTeamMembers.length > 0 ? (
-                              users
-                                .filter(user => selectedTeamMembers.includes(user._id) && user.role?.name === 'Team Member')
-                                .map(user => (
-                                  <option key={user._id} value={user._id}>
-                                    {user.firstname} {user.lastname} ({user.role?.name || "Role not defined"})
-                                  </option>
-                                ))
-                            ) : (
-                              <option disabled>No team members selected</option>
-                            )}
-                          </select>
-                        </div>
-                      </div>
-                      <div className="row mt-2">
-                        <div className="col-md-12">
-                          <label className="form-label">Description</label>
-                          <textarea
-                            className="form-control"
-                            value={newTask.description}
-                            onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
-                          />
-                        </div>
-                      </div>
-                      <div className="mt-2">
-                        <button
-                          type="button"
-                          className="btn btn-info me-2"
-                          onClick={suggestPriorityWithIA}
-                          disabled={isSuggestingPriority}
-                        >
-                          {isSuggestingPriority ? "Suggesting..." : "Suggest Priority with AI"}
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-outline-primary mt-2"
-                          onClick={addTaskToList}
-                        >
-                          Add task
-                        </button>
-                      </div>
-                    </div>
-                    {taskList.length > 0 && (
-                      <div className="mb-3">
-                        <h5>Added tasks</h5>
-                        <ul className="list-group">
-                          {taskList.map((task, index) => (
-                            <li key={index} className="list-group-item d-flex justify-content-between align-items-center">
-                              <span>
-                                {task.title} ({task.status}, {task.priority})
-                                {task.startDate && ` - Start: ${formatDate(task.startDate)}`}
-                                {task.dueDate && ` - Deadline: ${formatDate(task.dueDate)}`}
-                                {task.assignedTo.length > 0 && (
-                                  ` - Assigned to: ${task.assignedTo
-                                    .map(userId => {
-                                      const user = users.find(u => u._id === userId);
-                                      return user ? `${user.firstname} ${user.lastname}` : "Unknown";
-                                    })
-                                    .join(", ")
-                                  }`
-                                )}
-                              </span>
-                              <button
-                                type="button"
-                                className="btn btn-danger btn-sm"
-                                onClick={() => removeTaskFromList(index)}
-                              >
-                                Delete
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {formErrors.general && <div className="alert alert-danger">{formErrors.general}</div>}
-                    {success && <div className="alert alert-success">{success}</div>}
-                    <div className="modal-footer">
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={() => {
-                          setShowModal(false);
-                          resetModalState();
-                        }}
-                      >
-                        Close
-                      </button>
-                      <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                        {isSubmitting ? "Loading..." : (editingProject ? "Edit" : "Add")}
-                      </button>
-                    </div>
-                  </form>
+                  </div>
+                  <div className="mt-2">
+                    <Button
+                      variant="info"
+                      className="me-2"
+                      onClick={suggestPriorityWithIA}
+                      disabled={isSuggestingPriority}
+                    >
+                      {isSuggestingPriority ? 'Suggesting...' : 'Suggest Priority with AI'}
+                    </Button>
+                    <Button variant="outline-primary" onClick={addTaskToList}>
+                      Add task
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </div>
-          </div>
-          <div className="modal-backdrop fade show" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1100 }}></div>
-        </>
+                {taskList.length > 0 && (
+                  <div className="mb-3">
+                    <h5>Added tasks</h5>
+                    <ul className="list-group">
+                      {taskList.map((task, index) => (
+                        <li key={index} className="list-group-item d-flex justify-content-between align-items-center">
+                          <span>
+                            {task.title} ({task.status}, {task.priority})
+                            {task.startDate && ` - Start: ${formatDate(task.startDate)}`}
+                            {task.dueDate && ` - Deadline: ${formatDate(task.dueDate)}`}
+                            {task.assignedTo.length > 0 &&
+                              ` - Assigned to: ${task.assignedTo
+                                .map(userId => {
+                                  const user = users.find(u => u._id === userId);
+                                  return user ? `${user.firstname} ${user.lastname}` : 'Unknown';
+                                })
+                                .join(', ')}`}
+                          </span>
+                          <Button variant="danger" size="sm" onClick={() => removeTaskFromList(index)}>
+                            Delete
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {formErrors.general && <div className="alert alert-danger">{formErrors.general}</div>}
+                {success && <div className="alert alert-success">{success}</div>}
+                <Modal.Footer>
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setShowModal(false);
+                      resetModalState();
+                    }}
+                  >
+                    Close
+                  </Button>
+                  <Button variant="primary" type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? 'Loading...' : editingProject ? 'Edit' : 'Add'}
+                  </Button>
+                </Modal.Footer>
+              </form>
+            </Modal.Body>
+          </Modal>
+        </Suspense>
       )}
     </div>
   );

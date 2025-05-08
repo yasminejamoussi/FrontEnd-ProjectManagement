@@ -16,11 +16,12 @@ const Header = () => {
   const [newDueDate, setNewDueDate] = useState('');
   const [newAssignee, setNewAssignee] = useState('');
   const [userProfile, setUserProfile] = useState(null);
-  const [language, setLanguage] = useState('en'); // Ajout de l'état pour la langue
+  const [language, setLanguage] = useState('en');
   const searchRef = useRef(null);
   const appsRef = useRef(null);
   const notificationsRef = useRef(null);
   const profileRef = useRef(null);
+  const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:4000';
 
   const toggleDarkMode = () => {
     setDarkMode(!darkMode);
@@ -29,7 +30,10 @@ const Header = () => {
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get('http://localhost:4000/api/auth/users');
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${apiBaseUrl}/api/auth/users`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       console.log('Utilisateurs reçus :', response.data);
       setUsers(response.data);
     } catch (error) {
@@ -39,23 +43,26 @@ const Header = () => {
 
   const suggestUser = async () => {
     try {
-      const response = await axios.get('http://localhost:4000/api/tasks/user-task-counts');
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${apiBaseUrl}/api/tasks/user-task-counts`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const userTaskCounts = response.data.userTaskAnalysis;
       console.log('Comptes de tâches des utilisateurs :', userTaskCounts);
-  
+
       const availableUsers = userTaskCounts.filter(user => user.workloadStatus !== 'Overloaded');
-  
+
       if (availableUsers.length === 0) {
         console.warn('Aucun utilisateur disponible pour la réassignation.');
         setSuggestedUser(null);
         setNewAssignee('');
         return;
       }
-  
+
       const suggested = availableUsers.reduce((prev, curr) =>
         prev.workloadScore < curr.workloadScore ? prev : curr
       );
-  
+
       console.log('Utilisateur suggéré :', suggested);
       setSuggestedUser(suggested);
       setNewAssignee(suggested.userId);
@@ -74,17 +81,21 @@ const Header = () => {
         return;
       }
 
+      const token = localStorage.getItem('token');
       const { role, _id: userId } = userProfile;
       console.log('Rôle utilisateur :', role.name, 'ID utilisateur :', userId);
 
       // Récupérer les projets
       let projects = [];
       if (role.name === 'Admin') {
-        const projectsResponse = await axios.get('http://localhost:4000/api/projects');
+        const projectsResponse = await axios.get(`${apiBaseUrl}/api/projects`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         projects = projectsResponse.data;
         console.log('Projets reçus (Admin) :', projects.length);
       } else if (['Project Manager', 'Team Leader', 'Team Member'].includes(role.name)) {
-        const projectsResponse = await axios.get('http://localhost:4000/api/projects', {
+        const projectsResponse = await axios.get(`${apiBaseUrl}/api/projects`, {
+          headers: { Authorization: `Bearer ${token}` },
           params: {
             projectManager: userId,
             teamMembers: userId
@@ -102,7 +113,9 @@ const Header = () => {
       // Prédire les retards des projets
       const projectDelayPromises = projects.map(async (project) => {
         try {
-          const delayResponse = await axios.get(`http://localhost:4000/api/projects/${project._id}/predict-delay`);
+          const delayResponse = await axios.get(`${apiBaseUrl}/api/projects/${project._id}/predict-delay`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
           console.log(`Projet ${project.name} prédiction :`, delayResponse.data);
           return {
             type: 'project',
@@ -122,12 +135,12 @@ const Header = () => {
       // Récupérer les tâches
       let tasks = [];
       if (role.name === 'Admin') {
-        // Admin voit toutes les tâches
-        const tasksResponse = await axios.get('http://localhost:4000/api/tasks');
+        const tasksResponse = await axios.get(`${apiBaseUrl}/api/tasks`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         tasks = tasksResponse.data;
         console.log('Tâches reçues (Admin) :', tasks.length);
       } else if (role.name === 'Project Manager') {
-        // Project Manager : toutes les tâches des projets qu'ils gèrent
         const projectIds = projects
           .filter(project => {
             let isManager = false;
@@ -142,7 +155,8 @@ const Header = () => {
           .map(project => project._id);
         console.log('IDs des projets gérés :', projectIds);
         if (projectIds.length > 0) {
-          const tasksResponse = await axios.get('http://localhost:4000/api/tasks', {
+          const tasksResponse = await axios.get(`${apiBaseUrl}/api/tasks`, {
+            headers: { Authorization: `Bearer ${token}` },
             params: { projectId: projectIds }
           });
           console.log('Requête tâches envoyée avec params :', { projectId: projectIds });
@@ -150,11 +164,11 @@ const Header = () => {
           console.log('Tâches reçues (Project Manager) :', tasks.length, tasks.map(t => t.title));
         } else {
           console.log('Aucun projet géré trouvé pour ce Project Manager.');
-          // Fallback: If project is returned but not managed, try fetching tasks for all projects
           const allProjectIds = projects.map(project => project._id);
           if (allProjectIds.length > 0) {
             console.log('Fallback: Récupération des tâches pour tous les projets retournés :', allProjectIds);
-            const tasksResponse = await axios.get('http://localhost:4000/api/tasks', {
+            const tasksResponse = await axios.get(`${apiBaseUrl}/api/tasks`, {
+              headers: { Authorization: `Bearer ${token}` },
               params: { projectId: allProjectIds }
             });
             tasks = tasksResponse.data;
@@ -162,8 +176,8 @@ const Header = () => {
           }
         }
       } else if (['Team Leader', 'Team Member'].includes(role.name)) {
-        // Team Leader/Team Member : tâches assignées à l'utilisateur
-        const tasksResponse = await axios.get('http://localhost:4000/api/tasks', {
+        const tasksResponse = await axios.get(`${apiBaseUrl}/api/tasks`, {
+          headers: { Authorization: `Bearer ${token}` },
           params: { assignedTo: userId }
         });
         console.log('Requête tâches envoyée avec params :', { assignedTo: userId });
@@ -174,7 +188,9 @@ const Header = () => {
       // Prédire les retards des tâches
       const taskDelayPromises = tasks.map(async (task) => {
         try {
-          const delayResponse = await axios.get(`http://localhost:4000/api/tasks/${task._id}/predict-delay`);
+          const delayResponse = await axios.get(`${apiBaseUrl}/api/tasks/${task._id}/predict-delay`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
           console.log(`Tâche ${task.title} prédiction :`, delayResponse.data);
           return {
             type: 'task',
@@ -216,7 +232,7 @@ const Header = () => {
       }
 
       try {
-        const response = await axios.get("http://localhost:4000/api/profile", {
+        const response = await axios.get(`${apiBaseUrl}/api/profile`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         setUserProfile(response.data);
@@ -294,6 +310,7 @@ const Header = () => {
   const handleUpdateTask = async (e) => {
     e.preventDefault();
     try {
+      const token = localStorage.getItem('token');
       const updatedTask = {};
       if (newDueDate) updatedTask.dueDate = new Date(newDueDate);
       if (newAssignee) {
@@ -302,9 +319,11 @@ const Header = () => {
         );
         updatedTask.assignedTo = [...new Set([...existingAssignees, newAssignee])];
       }
-  
+
       console.log('Mise à jour de la tâche avec :', updatedTask);
-      await axios.put(`http://localhost:4000/api/tasks/${selectedTask.taskId}`, updatedTask);
+      await axios.put(`${apiBaseUrl}/api/tasks/${selectedTask.taskId}`, updatedTask, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       alert('Tâche mise à jour avec succès !');
       closeModal();
       fetchNotifications();
@@ -314,14 +333,11 @@ const Header = () => {
     }
   };
 
-  // Changement de langue
   const changeLanguage = (lang) => {
     setLanguage(lang);
-    // Ici, tu peux ajouter une logique pour mettre à jour les traductions si tu utilises i18next
     console.log('Langue changée en :', lang);
   };
 
-  // Traductions simples
   const translations = {
     en: {
       searchPlaceholder: 'Search...',
@@ -702,7 +718,6 @@ const Header = () => {
                           <i className="iconoir-user-love f-s-20"></i> Profile Details
                         </Link>
                       </li>
-                      
                       <li>
                         <NavLink
                           className="mb-0 btn btn-light-danger btn-sm d-flex align-items-center justify-content-center gap-2"
