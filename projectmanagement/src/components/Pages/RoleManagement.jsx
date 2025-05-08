@@ -14,6 +14,7 @@ const RoleManagement = () => {
     "Assign Roles",
     "View Reports",
   ];
+
   const [token, setToken] = useState(localStorage.getItem("token"));
   const [searchQuery, setSearchQuery] = useState("");
   const [entries, setEntries] = useState(10);
@@ -31,6 +32,8 @@ const RoleManagement = () => {
     permissions: [],
     users: [],
   });
+  const [selectedRoleForAssignment, setSelectedRoleForAssignment] = useState(null);
+  const [availableUsers, setAvailableUsers] = useState([]);
 
   useEffect(() => {
     const role = localStorage.getItem("role");
@@ -60,11 +63,11 @@ const RoleManagement = () => {
       .catch((error) => console.error("Erreur récupération rôles :", error));
   }, [token]);
 
-  const handleRoleChange = (e, mode = 'add') => {
+  const handleRoleChange = (e, mode = "add") => {
     const { name, value, type, checked, multiple } = e.target;
 
-    if (mode === 'edit' && selectedRole) {
-      if (type === 'checkbox') {
+    if (mode === "edit" && selectedRole) {
+      if (type === "checkbox") {
         setSelectedRole((prev) => ({
           ...prev,
           [name]: checked
@@ -80,7 +83,7 @@ const RoleManagement = () => {
         setSelectedRole((prev) => ({ ...prev, [name]: value }));
       }
     } else {
-      if (type === 'checkbox') {
+      if (type === "checkbox") {
         setNewRole((prev) => ({
           ...prev,
           [name]: checked
@@ -183,10 +186,11 @@ const RoleManagement = () => {
 
         setShowAddModal(false);
         setNewRole({ name: "", permissions: [], users: [] });
+        setSelectedRoleForAssignment(null);
       }
     } catch (error) {
       console.error("Erreur lors de l'assignation du rôle :", error);
-      alert("Erreur lors de l'assignation du rôle");
+      alert(error.response?.data?.message || "Erreur lors de l'assignation du rôle");
     }
   };
 
@@ -259,11 +263,12 @@ const RoleManagement = () => {
   };
 
   const filteredRoles = roles.filter((role) => {
-    if (!role.users || role.users.length === 0) return false;
-    return role.users.some((user) => {
+    const roleNameMatch = role.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const userNameMatch = role.users?.some((user) => {
       const fullName = `${user.firstname} ${user.lastname}`.toLowerCase();
       return fullName.includes(searchQuery.toLowerCase());
     });
+    return roleNameMatch || userNameMatch || searchQuery === "";
   });
 
   const indexOfLastRole = currentPage * entries;
@@ -276,6 +281,21 @@ const RoleManagement = () => {
       setCurrentPage(newPage);
     }
   };
+
+  useEffect(() => {
+    if (selectedRoleForAssignment && token) {
+      axios
+        .get(`http://localhost:4000/api/auth/users/by-role?roleName=${selectedRoleForAssignment}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        .then((response) => {
+          setAvailableUsers(response.data.users);
+        })
+        .catch((error) => console.error("Erreur fetching available users:", error));
+    } else {
+      setAvailableUsers([]);
+    }
+  }, [selectedRoleForAssignment, token]);
 
   return (
     <div className="app-wrapper">
@@ -319,10 +339,10 @@ const RoleManagement = () => {
                           type="text"
                           className="form-control"
                           style={{ borderColor: '#ced4da', borderRadius: '5px' }}
-                          placeholder="Search by username"
+                          placeholder="Search by role or username"
                           value={searchQuery}
                           onChange={(e) => handleSearch(e.target.value)}
-                          aria-label="Search by username"
+                          aria-label="Search by role or username"
                         />
                       </div>
                     </div>
@@ -369,12 +389,12 @@ const RoleManagement = () => {
                                   </span>
                                 </td>
                                 <td className="text-success-dark f-w-600">
-                                  {role.permissions?.join(", ") || "Aucune permission"}
+                                  {role.permissions?.join(", ") || "No permissions"}
                                 </td>
                                 <td className="text-success-dark f-w-600">
                                   {role.users?.length
                                     ? role.users.map((user) => `${user.firstname} ${user.lastname}`).join(", ")
-                                    : "Aucun utilisateur"}
+                                    : "No Users"}
                                 </td>
                                 <td>
                                   <button
@@ -444,15 +464,20 @@ const RoleManagement = () => {
         </main>
       </div>
 
-      <Modal show={showAddModal} onHide={() => setShowAddModal(false)}>
+      <Modal show={showAddModal} onHide={() => { setShowAddModal(false); setSelectedRoleForAssignment(null); setNewRole({ name: "", permissions: [], users: [] }); }}>
+        <Modal.Header closeButton>
+          <Modal.Title>Assign a Role to a User</Modal.Title>
+        </Modal.Header>
         <Modal.Body>
-          <h4>Assign a role to a user</h4>
           <div className="mb-3">
-            <label>Role</label>
+            <label className="form-label">Role</label>
             <select
               className="form-control"
               value={newRole.name}
-              onChange={(e) => setNewRole({ ...newRole, name: e.target.value })}
+              onChange={(e) => {
+                setNewRole({ ...newRole, name: e.target.value });
+                setSelectedRoleForAssignment(e.target.value);
+              }}
             >
               <option value="">Select a role</option>
               {roles.map((role) => (
@@ -462,38 +487,50 @@ const RoleManagement = () => {
               ))}
             </select>
           </div>
-          <div className="mb-3">
-            <label>Users</label>
-            <select
-              className="form-control"
-              value={newRole.users[0] || ""}
-              onChange={(e) => setNewRole({ ...newRole, users: [e.target.value] })}
-            >
-              <option value="">Select a user</option>
-              {allUsers.map((user) => (
-                <option key={user._id} value={user._id}>
-                  {user.firstname} {user.lastname}
-                </option>
-              ))}
-            </select>
-          </div>
-          <Button variant="primary" onClick={handleAddRole} className="mt-3">
-            Assign a role
-          </Button>
+          {selectedRoleForAssignment && (
+            <div className="mb-3">
+              <label className="form-label">User</label>
+              <select
+                className="form-control"
+                value={newRole.users[0] || ""}
+                onChange={(e) => setNewRole({ ...newRole, users: [e.target.value] })}
+              >
+                <option value="">Select a user</option>
+                {availableUsers.map((user) => (
+                  <option key={user._id} value={user._id}>
+                    {user.firstname} {user.lastname}
+                  </option>
+                ))}
+              </select>
+              <small className="form-text text-muted">
+                Only users with roles below the selected role are available due to hierarchy restrictions.
+              </small>
+            </div>
+          )}
         </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => { setShowAddModal(false); setSelectedRoleForAssignment(null); setNewRole({ name: "", permissions: [], users: [] }); }}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={handleAddRole} disabled={!newRole.name || !newRole.users[0]}>
+            Assign Role
+          </Button>
+        </Modal.Footer>
       </Modal>
 
       <Modal show={showCreateRoleModal} onHide={() => setShowCreateRoleModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Create a New Role</Modal.Title>
+        </Modal.Header>
         <Modal.Body>
-          <h4>Créer un nouveau rôle</h4>
           <div className="mb-3">
-            <label>Nom du rôle</label>
+            <label className="form-label">Role Name</label>
             <input
               type="text"
               className="form-control"
               value={newRole.name}
               onChange={(e) => setNewRole({ ...newRole, name: e.target.value })}
-              placeholder="Entrez le nom du rôle"
+              placeholder="Enter role name"
             />
           </div>
           <div className="permissions-list" style={{ marginTop: "20px" }}>
@@ -515,35 +552,47 @@ const RoleManagement = () => {
               </div>
             ))}
           </div>
-          <Button variant="primary" onClick={handleCreateRole} className="mt-3">
-            Créer le rôle
-          </Button>
         </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowCreateRoleModal(false)}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={handleCreateRole}>
+            Create Role
+          </Button>
+        </Modal.Footer>
       </Modal>
 
       <Modal show={showEditModal} onHide={() => setShowEditModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Edit Role</Modal.Title>
+        </Modal.Header>
         <Modal.Body>
-          <h4>Modifier le rôle</h4>
-          <input
-            type="text"
-            className="form-control"
-            name="name"
-            value={selectedRole?.name || ""}
-            onChange={(e) => setSelectedRole((prev) => ({ ...prev, name: e.target.value }))}
-            placeholder="Nom du rôle"
-          />
+          <div className="mb-3">
+            <label className="form-label">Role Name</label>
+            <input
+              type="text"
+              className="form-control"
+              name="name"
+              value={selectedRole?.name || ""}
+              onChange={(e) => setSelectedRole((prev) => ({ ...prev, name: e.target.value }))}
+              placeholder="Role name"
+            />
+          </div>
           <div className="user-list" style={{ maxHeight: "200px", overflowY: "auto", marginTop: "10px" }}>
-            <h5>Utilisateurs</h5>
+            <h5>Users</h5>
             {allUsers.length > 0 ? (
               <select
                 multiple
                 className="form-control"
                 name="users"
                 value={selectedRole?.users || []}
-                onChange={(e) => setSelectedRole((prev) => ({
-                  ...prev,
-                  users: Array.from(e.target.selectedOptions, (option) => option.value),
-                }))}
+                onChange={(e) =>
+                  setSelectedRole((prev) => ({
+                    ...prev,
+                    users: Array.from(e.target.selectedOptions, (option) => option.value),
+                  }))
+                }
               >
                 {allUsers.map((user) => (
                   <option key={user._id} value={user._id}>
@@ -552,7 +601,7 @@ const RoleManagement = () => {
                 ))}
               </select>
             ) : (
-              <p>Aucun utilisateur trouvé.</p>
+              <p>No users found.</p>
             )}
           </div>
           <div className="permissions-list" style={{ marginTop: "20px" }}>
@@ -566,7 +615,7 @@ const RoleManagement = () => {
                   name="permissions"
                   value={permission}
                   checked={selectedRole?.permissions.includes(permission)}
-                  onChange={(e) => handleRoleChange(e, 'edit')}
+                  onChange={(e) => handleRoleChange(e, "edit")}
                 />
                 <label className="form-check-label" htmlFor={permission}>
                   {permission}
@@ -574,19 +623,32 @@ const RoleManagement = () => {
               </div>
             ))}
           </div>
-          <Button variant="primary" onClick={handleSaveRole} className="mt-3">
-            Sauvegarder
-          </Button>
         </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowEditModal(false)}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={handleSaveRole}>
+            Save
+          </Button>
+        </Modal.Footer>
       </Modal>
 
       <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Confirm Deletion</Modal.Title>
+        </Modal.Header>
         <Modal.Body>
-          <h4>Confirmer la suppression ?</h4>
-          <Button variant="danger" onClick={handleConfirmDelete}>
-            Oui, Supprimer
-          </Button>
+          <p>Are you sure you want to delete this role?</p>
         </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={handleConfirmDelete}>
+            Yes, Delete
+          </Button>
+        </Modal.Footer>
       </Modal>
     </div>
   );

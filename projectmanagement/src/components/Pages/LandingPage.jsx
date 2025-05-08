@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Navbar as BSNavbar, Nav, Button, Tab, Tabs } from 'react-bootstrap';
+import { Navbar as BSNavbar, Nav, Button, Tab, Tabs, Dropdown } from 'react-bootstrap';
 import Typed from 'typed.js';
 import AOS from 'aos';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 // Importation de toutes les images
 import LogoBlanc from '../../assets/images/logo/LogoBlanc.png';
@@ -35,6 +36,7 @@ import DarkLayout1 from '../../assets/images/landing/dark-layout-1.png';
 const fallbackImage = 'https://via.placeholder.com/150?text=Image+Not+Found';
 
 function LandingPage() {
+  const { t, i18n } = useTranslation();
   const [isSpeaking, setIsSpeaking] = useState({});
 
   // Define handleImageError
@@ -46,7 +48,7 @@ function LandingPage() {
   useEffect(() => {
     AOS.init({ duration: 1000 });
     const typed = new Typed('#highlight-typed', {
-      strings: ['Projects', 'Teams', 'Workflow'],
+      strings: ['Projects', 'Teams', 'Workflow'], // Ces chaînes peuvent être traduites si nécessaire
       typeSpeed: 50,
       backSpeed: 50,
       loop: true,
@@ -61,21 +63,19 @@ function LandingPage() {
         setIsSpeaking({ ...isSpeaking, [section]: false });
       } else {
         const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'en-GB'; // Changé pour l'anglais britannique
-  
-        // Obtenir les voix disponibles
+        utterance.lang = i18n.language === 'fr' ? 'fr-FR' : 'en-GB';
+
         const voices = window.speechSynthesis.getVoices();
-        // Sélectionner une voix en-GB
-        const enGBVoice = voices.find(
-          (voice) => voice.lang === 'en-GB' || voice.lang === 'en_GB'
+        const voice = voices.find(
+          (voice) => voice.lang === (i18n.language === 'fr' ? 'fr-FR' : 'en-GB')
         );
-  
-        if (enGBVoice) {
-          utterance.voice = enGBVoice;
+
+        if (voice) {
+          utterance.voice = voice;
         } else {
-          console.warn('Aucune voix en-GB disponible, utilisation de la voix par défaut.');
+          console.warn(`Aucune voix ${i18n.language === 'fr' ? 'fr-FR' : 'en-GB'} disponible, utilisation de la voix par défaut.`);
         }
-  
+
         utterance.onend = () => setIsSpeaking({ ...isSpeaking, [section]: false });
         utterance.onerror = (e) => console.error('Erreur SpeechSynthesis :', e);
         window.speechSynthesis.speak(utterance);
@@ -84,6 +84,10 @@ function LandingPage() {
     } else {
       console.warn('La synthèse vocale n\'est pas supportée dans ce navigateur.');
     }
+  };
+
+  const changeLanguage = (lng) => {
+    i18n.changeLanguage(lng);
   };
 
   return (
@@ -102,19 +106,28 @@ function LandingPage() {
               <BSNavbar.Toggle aria-controls="landing_nav" />
               <BSNavbar.Collapse id="landing_nav">
                 <Nav className="m-auto">
-                  <Nav.Link href="" active>Home</Nav.Link>
-                  <Nav.Link href="#AboutUs">About Us</Nav.Link>
-                  <Nav.Link href="#services">Features</Nav.Link>
-                  <Nav.Link href="mailto:Contact@orkestra.tn" target="_blank">Contact</Nav.Link>
+                  <Nav.Link href="" active>{t('header.home', 'Home')}</Nav.Link>
+                  <Nav.Link href="#AboutUs">{t('header.aboutUs', 'About Us')}</Nav.Link>
+                  <Nav.Link href="#services">{t('header.features', 'Features')}</Nav.Link>
+                  <Nav.Link href="mailto:Contact@orkestra.tn" target="_blank">{t('header.contact', 'Contact')}</Nav.Link>
                 </Nav>
+                <Dropdown className="me-2">
+                  <Dropdown.Toggle variant="outline-light" id="language-dropdown">
+                    <i className="fas fa-globe me-1"></i> {t('header.language', 'Language')}
+                  </Dropdown.Toggle>
+                  <Dropdown.Menu>
+                    <Dropdown.Item onClick={() => changeLanguage('en')}>English</Dropdown.Item>
+                    <Dropdown.Item onClick={() => changeLanguage('fr')}>Français</Dropdown.Item>
+                  </Dropdown.Menu>
+                </Dropdown>
                 <Link to="/signin">
                   <Button variant="danger" className="rounded">
-                    Sign In
+                    {t('header.signIn', 'Sign In')}
                   </Button>
                 </Link>
                 <Link to="/signup">
                   <Button variant="primary" className="ms-2 rounded">
-                    Sign Up
+                    {t('header.signUp', 'Sign Up')}
                   </Button>
                 </Link>
               </BSNavbar.Collapse>
@@ -140,23 +153,21 @@ function LandingPage() {
                       }}
                       onClick={() =>
                         speakText(
-                          'Power Up Your Workflow With Orkestra. Orkestra is the best AI based project management platform!',
+                          t('hero.speak', 'Power Up Your Workflow With Orkestra. Orkestra is the best AI based project management platform!'),
                           'hero'
                         )
                       }
                       onMouseEnter={(e) => (e.target.style.opacity = 1)}
                       onMouseLeave={(e) => (e.target.style.opacity = 0.7)}
                     ></i>
-                    <h1>
-                      Power Up Your <br /> <span id="highlight-typed"></span> With Orkestra <br />
-                    </h1>
+                    <h1 dangerouslySetInnerHTML={{ __html: t('hero.title') }} />
                     <img
                       alt="shape"
                       className="img-fluid landing-vector-shape"
                       src={VectorShaps}
                       onError={handleImageError}
                     />
-                    <p>Orkestra is the best AI based <br />project management platform!</p>
+                    <p dangerouslySetInnerHTML={{ __html: t('hero.subtitle') }} />
                     <div className="mg-t-20">
                       <a
                         className="btn btn-danger py-3 px-4 b-r-50 btn-lg ms-2"
@@ -164,7 +175,7 @@ function LandingPage() {
                         target="_blank"
                         role="button"
                       >
-                        Try it now
+                        {t('hero.button')}
                       </a>
                     </div>
                   </div>
@@ -201,7 +212,7 @@ function LandingPage() {
             }}
             onClick={() =>
               speakText(
-                'About Us. At Orkestra, we harness the power of artificial intelligence to make project management smarter, more efficient, and seamlessly accessible to everyone. Our mission is to help engineers, project managers, and teams organize, track, and successfully complete their projects without getting lost in complex processes. AI-based task prioritization, AI-based project delay prediction, Predictive Analytics for Task Completion, Task assignment recommendation.',
+                t('about.speak', 'About Us. At Orkestra, we harness the power of artificial intelligence to make project management smarter, more efficient, and seamlessly accessible to everyone. Our mission is to help engineers, project managers, and teams organize, track, and successfully complete their projects without getting lost in complex processes. AI-based task prioritization, AI-based project delay prediction, Predictive Analytics for Task Completion, Task assignment recommendation.'),
                 'about'
               )
             }
@@ -212,23 +223,14 @@ function LandingPage() {
             <div className="row">
               <div className="col-lg-7">
                 <div className="landing-title">
-                  <h1 style={{ color: '#333' }}>
-                    About <span className="highlight-title">Us</span>
-                  </h1>
-                  <p>
-                    At Orkestra, we harness the power of artificial intelligence to make project management smarter, more
-                    efficient, and seamlessly accessible to everyone.
-                  </p>
-                  <p>
-                    Our mission is to help engineers, project managers, and teams organize, track, and successfully complete
-                    their projects without getting lost in complex processes.
-                  </p>
+                  <h1 style={{ color: '#333' }} dangerouslySetInnerHTML={{ __html: t('about.title') }} />
+                  <p>{t('about.description1')}</p>
+                  <p>{t('about.description2')}</p>
                 </div>
                 <ul className="card-details-list">
-                  <li>AI-based task prioritization</li>
-                  <li>AI-based project delay prediction</li>
-                  <li>Predictive Analytics for Task Completion</li>
-                  <li>Task assignment recommendation</li>
+                  {t('about.features', { returnObjects: true }).map((feature, index) => (
+                    <li key={index}>{feature}</li>
+                  ))}
                 </ul>
               </div>
               <div className="col-lg-5 col-sm-6 d-flex align-items-center justify-content-center" style={{ position: 'relative' }}>
@@ -246,7 +248,7 @@ function LandingPage() {
                   }}
                   onClick={() =>
                     speakText(
-                      'The logo features a stylized hand holding a conductor’s baton in purple, next to the word “ORKESTRA” in bold, uppercase black letters. It conveys themes of coordination, leadership, and harmony.',
+                      t('about.logoSpeak', 'The logo features a stylized hand holding a conductor’s baton in purple, next to the word “ORKESTRA” in bold, uppercase black letters. It conveys themes of coordination, leadership, and harmony.'),
                       'logo'
                     )
                   }
@@ -273,7 +275,7 @@ function LandingPage() {
             }}
             onClick={() =>
               speakText(
-                'Our Features. Empowering you with the best tools for project success. User Authentication: Secure login and role-based access ensure that only authorized users can view or modify project details. Project Management: Easily create, track, and manage projects, keeping everything on schedule with real-time updates. Task Management: Create, assign, and prioritize tasks efficiently to boost productivity and meet deadlines. Dashboard & Smart Notifications: Get a clear project overview with a customizable dashboard and stay informed with smart alerts. Activity Log & History: Track all project activities, decisions, and updates for transparency and accountability.',
+                t('features.speak', 'Our Features. Empowering you with the best tools for project success. User Authentication: Secure login and role-based access ensure that only authorized users can view or modify project details. Project Management: Easily create, track, and manage projects, keeping everything on schedule with real-time updates. Task Management: Create, assign, and prioritize tasks efficiently to boost productivity and meet deadlines. Dashboard & Smart Notifications: Get a clear project overview with a customizable dashboard and stay informed with smart alerts. Activity Log & History: Track all project activities, decisions, and updates for transparency and accountability.'),
                 'features'
               )
             }
@@ -281,42 +283,42 @@ function LandingPage() {
             onMouseLeave={(e) => (e.target.style.opacity = 0.7)}
           ></i>
           <div className="container">
-            <h1 className="text-center mb-2" style={{ color: '#f00ac8' }}>Our Features</h1>
-            <p className="text-center text-light mb-4">Empowering you with the best tools for project success.</p>
+            <h1 className="text-center mb-2" style={{ color: '#f00ac8' }}>{t('features.title')}</h1>
+            <p className="text-center text-light mb-4">{t('features.subtitle')}</p>
             <div className="row text-center">
               <div className="col-md-4 mb-4 d-flex">
                 <div className="service-box p-4 border rounded shadow-sm w-100 h-100">
                   <i className="fas fa-user-shield fa-3x"></i>
-                  <h3 className="highlight-title mt-3">User Authentication</h3>
-                  <p>Secure login and role-based access ensure that only authorized users can view or modify project details.</p>
+                  <h3 className="highlight-title mt-3">{t('features.userAuth')}</h3>
+                  <p>{t('features.userAuthDesc')}</p>
                 </div>
               </div>
               <div className="col-md-4 mb-4 d-flex">
                 <div className="service-box p-4 border rounded shadow-sm w-100 h-100">
                   <i className="fas fa-folder-open fa-3x"></i>
-                  <h3 className="highlight-title mt-3">Project Management</h3>
-                  <p>Easily create, track, and manage projects, keeping everything on schedule with real-time updates.</p>
+                  <h3 className="highlight-title mt-3">{t('features.projectManagement')}</h3>
+                  <p>{t('features.projectManagementDesc')}</p>
                 </div>
               </div>
               <div className="col-md-4 mb-4 d-flex">
                 <div className="service-box p-4 border rounded shadow-sm w-100 h-100">
                   <i className="fas fa-list-check fa-3x"></i>
-                  <h3 className="highlight-title mt-3">Task Management</h3>
-                  <p>Create, assign, and prioritize tasks efficiently to boost productivity and meet deadlines.</p>
+                  <h3 className="highlight-title mt-3">{t('features.taskManagement')}</h3>
+                  <p>{t('features.taskManagementDesc')}</p>
                 </div>
               </div>
               <div className="col-md-6 mb-4 d-flex">
                 <div className="service-box p-4 border rounded shadow-sm w-100 h-100">
                   <i className="fas fa-bell fa-3x"></i>
-                  <h3 className="highlight-title mt-3">Dashboard & Smart Notifications</h3>
-                  <p>Get a clear project overview with a customizable dashboard and stay informed with smart alerts.</p>
+                  <h3 className="highlight-title mt-3">{t('features.dashboardNotifications')}</h3>
+                  <p>{t('features.dashboardNotificationsDesc')}</p>
                 </div>
               </div>
               <div className="col-md-6 mb-4 d-flex">
                 <div className="service-box p-4 border rounded shadow-sm w-100 h-100">
                   <i className="fas fa-history fa-3x"></i>
-                  <h3 className="highlight-title mt-3">Activity Log & History</h3>
-                  <p>Track all project activities, decisions, and updates for transparency and accountability.</p>
+                  <h3 className="highlight-title mt-3">{t('features.activityLog')}</h3>
+                  <p>{t('features.activityLogDesc')}</p>
                 </div>
               </div>
             </div>
@@ -338,7 +340,7 @@ function LandingPage() {
             }}
             onClick={() =>
               speakText(
-                'Orkestra revolutionizes project management. Take a glimpse at our platform through a showcase of key features designed specifically to optimize your workflow.',
+                t('demo.speak', 'Orkestra revolutionizes project management. Take a glimpse at our platform through a showcase of key features designed specifically to optimize your workflow.'),
                 'demo'
               )
             }
@@ -349,10 +351,8 @@ function LandingPage() {
             <div className="row">
               <div className="col-xl-6 offset-xl-3">
                 <div className="landing-title text-md-center">
-                  <h3 style={{ color: '#333' }}>
-                    Orkestra <span className="highlight-title">revolutionizes</span> project management
-                  </h3>
-                  <p>Take a glimpse at our platform through a showcase of key features designed specifically to optimize your workflow.</p>
+                  <h3 style={{ color: '#333' }} dangerouslySetInnerHTML={{ __html: t('demo.title') }} />
+                  <p>{t('demo.subtitle')}</p>
                 </div>
               </div>
             </div>
@@ -638,7 +638,7 @@ function LandingPage() {
             }}
             onClick={() =>
               speakText(
-                'Discover Our Dark Layout. Embrace the elegance of the dark layout, where simplicity meets sophistication. Navigate effortlessly through your admin tasks with style.',
+                t('dark.speak', 'Discover Our Dark Layout. Embrace the elegance of the dark layout, where simplicity meets sophistication. Navigate effortlessly through your admin tasks with style.'),
                 'dark'
               )
             }
@@ -649,12 +649,8 @@ function LandingPage() {
             <div className="row">
               <div className="col-xl-6 offset-xl-3">
                 <div className="landing-title text-md-center">
-                  <h2>
-                    Discover Our <span className="highlight-title">Dark Layout</span>
-                  </h2>
-                  <p className="text-light">
-                    Embrace the elegance of the dark layout, where simplicity meets sophistication. Navigate effortlessly through your admin tasks with style.
-                  </p>
+                  <h2 dangerouslySetInnerHTML={{ __html: t('dark.title') }} />
+                  <p className="text-light">{t('dark.subtitle')}</p>
                 </div>
               </div>
               <div className="col-12">
@@ -673,7 +669,7 @@ function LandingPage() {
               </div>
               <div className="col-12 text-center">
                 <Button variant="primary" size="lg" className="mt-5" id="darkDemoBtn">
-                  Check Now <i className="ti ti-chevrons-right ms-2"></i>
+                  {t('dark.button')} <i className="ti ti-chevrons-right ms-2"></i>
                 </Button>
               </div>
             </div>
@@ -696,7 +692,7 @@ function LandingPage() {
               }}
               onClick={() =>
                 speakText(
-                  'Prioritization of Tasks with AI Assistance. Analytics Dashboard for Project Insights. Predictive Analytics for Risk & Deadline Management. Advanced Role-Based Access and Permissions. Task Dependencies and Milestone Tracking. Real-Time Project Status Updates. Task and Resource Allocation. Comprehensive Activity Log. Integration with 3rd Party Tools. Team Performance Metrics. Secure Cloud Storage for Documents.',
+                  t('wrapper.speak', 'Prioritization of Tasks with AI Assistance. Analytics Dashboard for Project Insights. Predictive Analytics for Risk & Deadline Management. Advanced Role-Based Access and Permissions. Task Dependencies and Milestone Tracking. Real-Time Project Status Updates. Task and Resource Allocation. Comprehensive Activity Log. Integration with 3rd Party Tools. Team Performance Metrics. Secure Cloud Storage for Documents.'),
                   'wrapper'
                 )
               }
@@ -704,17 +700,9 @@ function LandingPage() {
               onMouseLeave={(e) => (e.target.style.opacity = 0.7)}
             ></i>
             <ul className="box-wrapper-list">
-              <li>Prioritization of Tasks with AI Assistance</li>
-              <li>Analytics Dashboard for Project Insights</li>
-              <li>Predictive Analytics for Risk & Deadline Management</li>
-              <li>Advanced Role-Based Access and Permissions</li>
-              <li>Task Dependencies and Milestone Tracking</li>
-              <li>Real-Time Project Status Updates</li>
-              <li>Task and Resource Allocation</li>
-              <li>Comprehensive Activity Log</li>
-              <li>Integration with 3rd Party Tools</li>
-              <li>Team Performance Metrics</li>
-              <li>Secure Cloud Storage for Documents</li>
+              {t('wrapper.features', { returnObjects: true }).map((feature, index) => (
+                <li key={index}>{feature}</li>
+              ))}
             </ul>
           </div>
         </section>
@@ -734,7 +722,7 @@ function LandingPage() {
             }}
             onClick={() =>
               speakText(
-                'The best AI powered Project Management platform! Our Features: User Authentication, Project Management, Task Management, Dashboard & Smart Notifications, Activity Log & History. Contact us: Phone +216 29 197 240, Email contact@orkestra.tn, Facebook, Instagram, Twitter.',
+                t('footer.speak', 'The best AI powered Project Management platform! Our Features: User Authentication, Project Management, Task Management, Dashboard & Smart Notifications, Activity Log & History. Contact us: Phone +216 29 197 240, Email contact@orkestra.tn, Facebook, Instagram, Twitter.'),
                 'footer'
               )
             }
@@ -744,26 +732,18 @@ function LandingPage() {
           <div className="container">
             <div className="d-flex align-items-between flex-wrap">
               <div className="col-md-3 text-white">
-                <h3 className="text-white">
-                  The best <span className="highlight-title">AI powered</span> Project Management platform!
-                </h3>
+                <h3 className="text-white" dangerouslySetInnerHTML={{ __html: t('footer.title') }} />
               </div>
               <div className="col-md-3 text-white">
-                <h3 className="text-white">
-                  Our <span className="highlight-title">Features</span>
-                </h3>
+                <h3 className="text-white" dangerouslySetInnerHTML={{ __html: t('footer.featuresTitle') }} />
                 <ul className="list-unstyled">
-                  <li><i className="fas fa-user-check"></i> User Authentication</li>
-                  <li><i className="fas fa-project-diagram"></i> Project Management</li>
-                  <li><i className="fas fa-tasks"></i> Task Management</li>
-                  <li><i className="fas fa-bell"></i> Dashboard & Smart Notifications</li>
-                  <li><i className="fas fa-history"></i> Activity Log & History</li>
+                  {t('footer.features', { returnObjects: true }).map((feature, index) => (
+                    <li key={index}><i className={`fas fa-${index === 0 ? 'user-check' : index === 1 ? 'project-diagram' : index === 2 ? 'tasks' : index === 3 ? 'bell' : 'history'}`}></i> {feature}</li>
+                  ))}
                 </ul>
               </div>
               <div className="col-md-3">
-                <h3 className="text-white">
-                  Contact <span className="highlight-title">us</span>
-                </h3>
+                <h3 className="text-white" dangerouslySetInnerHTML={{ __html: t('footer.contactTitle') }} />
                 <ul className="list-unstyled">
                   <li><i className="fas fa-phone-alt"></i> <a className="text-white" href="tel:+21629197240">+216 29 197 240</a></li>
                   <li><i className="fas fa-envelope"></i> <a className="text-white" href="mailto:contact@orkestra.tn">contact@orkestra.tn</a></li>

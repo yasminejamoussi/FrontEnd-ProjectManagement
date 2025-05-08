@@ -15,7 +15,8 @@ const Header = () => {
   const [suggestedUser, setSuggestedUser] = useState(null);
   const [newDueDate, setNewDueDate] = useState('');
   const [newAssignee, setNewAssignee] = useState('');
-  const [userProfile, setUserProfile] = useState(null); 
+  const [userProfile, setUserProfile] = useState(null);
+  const [language, setLanguage] = useState('en'); // Ajout de l'état pour la langue
   const searchRef = useRef(null);
   const appsRef = useRef(null);
   const notificationsRef = useRef(null);
@@ -313,6 +314,79 @@ const Header = () => {
     }
   };
 
+  // Changement de langue
+  const changeLanguage = (lang) => {
+    setLanguage(lang);
+    // Ici, tu peux ajouter une logique pour mettre à jour les traductions si tu utilises i18next
+    console.log('Langue changée en :', lang);
+  };
+
+  // Traductions simples
+  const translations = {
+    en: {
+      searchPlaceholder: 'Search...',
+      appsTitle: 'Shortcuts',
+      notificationsTitle: 'Notifications ({count})',
+      profileTitle: 'Profile',
+      updateTaskTitle: 'Update Task',
+      dueDateLabel: 'Due Date',
+      assignedToLabel: 'Assigned To',
+      selectMember: 'Select a member',
+      suggestedByAI: '(Suggested By AI)',
+      aiSuggestion: 'AI thinks {name} could help! (Assigned tasks: {count})',
+      cancelButton: 'Cancel',
+      updateButton: 'Update',
+      noAlerts: 'No alerts at the moment.',
+    },
+    fr: {
+      searchPlaceholder: 'Rechercher...',
+      appsTitle: 'Raccourcis',
+      notificationsTitle: 'Notifications ({count})',
+      profileTitle: 'Profil',
+      updateTaskTitle: 'Mettre à jour la tâche',
+      dueDateLabel: 'Date d\'échéance',
+      assignedToLabel: 'Assigné à',
+      selectMember: 'Sélectionner un membre',
+      suggestedByAI: '(Suggéré par IA)',
+      aiSuggestion: 'L\'IA pense que {name} pourrait aider ! (Tâches assignées : {count})',
+      cancelButton: 'Annuler',
+      updateButton: 'Mettre à jour',
+      noAlerts: 'Aucune alerte pour le moment.',
+    },
+    es: {
+      searchPlaceholder: 'Buscar...',
+      appsTitle: 'Accesos directos',
+      notificationsTitle: 'Notificaciones ({count})',
+      profileTitle: 'Perfil',
+      updateTaskTitle: 'Actualizar tarea',
+      dueDateLabel: 'Fecha de vencimiento',
+      assignedToLabel: 'Asignado a',
+      selectMember: 'Seleccionar miembro',
+      suggestedByAI: '(Sugerido por IA)',
+      aiSuggestion: '¡La IA piensa que {name} podría ayudar! (Tareas asignadas: {count})',
+      cancelButton: 'Cancelar',
+      updateButton: 'Actualizar',
+      noAlerts: 'No hay alertas por el momento.',
+    },
+    ar: {
+      searchPlaceholder: 'بحث...',
+      appsTitle: 'اختصارات',
+      notificationsTitle: 'الإشعارات ({count})',
+      profileTitle: 'الملف الشخصي',
+      updateTaskTitle: 'تحديث المهمة',
+      dueDateLabel: 'تاريخ الاستحقاق',
+      assignedToLabel: 'المسؤول',
+      selectMember: 'اختر عضوًا',
+      suggestedByAI: '(مقترح بواسطة الذكاء الاصطناعي)',
+      aiSuggestion: 'يعتقد الذكاء الاصطناعي أن {name} يمكن أن يساعد! (المهام المعينة: {count})',
+      cancelButton: 'إلغاء',
+      updateButton: 'تحديث',
+      noAlerts: 'لا توجد تنبيهات في الوقت الحالي.',
+    },
+  };
+
+  const t = translations[language];
+
   return (
     <header className="header-main">
       <div className="container-fluid">
@@ -352,7 +426,7 @@ const Header = () => {
                           <div className="position-relative">
                             <input
                               className="form-control search-filter"
-                              placeholder="Rechercher..."
+                              placeholder={t.searchPlaceholder}
                               type="search"
                             />
                             <i className="ti ti-search text-dark" style={{ color: 'black' }}></i>
@@ -414,59 +488,64 @@ const Header = () => {
                 </div>
               </li>
 
-              {/* Applications */}
+              {/* Traduction (remplace Applications) */}
               <li className="header-apps">
                 <a
                   className="d-block head-icon"
                   href="#"
-                  onClick={(e) => handleOpenClick(e, 'apps')}
+                  onClick={(e) => handleOpenClick(e, 'translation')}
                   role="button"
-                  aria-label="Ouvrir les applications"
+                  aria-label="Ouvrir les options de traduction"
                 >
-                 <i className="iconoir-key-command" style={{ color: '#7b14bb' }}></i>
+                  <i className="iconoir-key-command" style={{ color: '#7b14bb' }}></i>
                 </a>
                 <div
-                  className={`offcanvas offcanvas-end header-apps-canvas ${openPanel === 'apps' ? 'show' : ''}`}
+                  className={`offcanvas offcanvas-end header-apps-canvas ${openPanel === 'translation' ? 'show' : ''}`}
                   tabIndex="-1"
                   ref={appsRef}
-                  aria-hidden={openPanel !== 'apps'}
+                  aria-hidden={openPanel !== 'translation'}
                 >
                   <div className="offcanvas-header">
-                    <h5 className="offcanvas-title">Raccourcis</h5>
+                    <h5 className="offcanvas-title">Language Settings</h5>
                     <button
                       className="btn-close"
                       onClick={closeOffcanvas}
-                      aria-label="Fermer les applications"
+                      aria-label="Fermer les options de traduction"
                     ></button>
                   </div>
                   <div className="offcanvas-body app-scroll">
-                    <div className="row row-cols-3">
-                      <div className="d-flex-center text-center mb-3">
-                        <NavLink to="/product" target="_blank">
-                          <span className="text-light-info h-45 w-45 d-flex-center b-r-15">
-                            <ShoppingBagOpen size={30} className="ph-duotone" />
-                          </span>
-                          <p className="mb-0 f-w-500 text-info">E-shop</p>
-                        </NavLink>
+                    <div className="row row-cols-2">
+                      <div className="col mb-3">
+                        <button
+                          className="btn btn-outline-primary w-100"
+                          onClick={() => changeLanguage('en')}
+                        >
+                          English
+                        </button>
                       </div>
-                      <div className="d-flex-center text-center mb-3">
-                        <NavLink to="/email" target="_blank">
-                          <span className="text-light-primary h-45 w-45 d-flex-center b-r-15 position-relative">
-                            <Envelope size={30} className="ph-duotone" />
-                          </span>
-                          <p className="mb-0 f-w-500 text-primary">Email</p>
-                        </NavLink>
+                      <div className="col mb-3">
+                        <button
+                          className="btn btn-outline-primary w-100"
+                          onClick={() => changeLanguage('fr')}
+                        >
+                          Français
+                        </button>
                       </div>
-                      <div className="d-flex-center text-center mb-3">
-                        <NavLink to="/chat" target="_blank">
-                          <span className="text-light-danger h-45 w-45 d-flex-center b-r-15 position-relative">
-                            <ChatCircleText size={30} className="ph-duotone" />
-                            <span className="position-absolute top-space-5 start-100 translate-middle badge rounded-pill bg-success badge-notification">
-                              99+
-                            </span>
-                          </span>
-                          <p className="mb-0 f-w-500 text-danger">Chat</p>
-                        </NavLink>
+                      <div className="col mb-3">
+                        <button
+                          className="btn btn-outline-primary w-100"
+                          onClick={() => changeLanguage('es')}
+                        >
+                          Español
+                        </button>
+                      </div>
+                      <div className="col mb-3">
+                        <button
+                          className="btn btn-outline-primary w-100"
+                          onClick={() => changeLanguage('ar')}
+                        >
+                          العربية
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -483,7 +562,7 @@ const Header = () => {
                   {darkMode ? (
                     <i className="iconoir-half-moon"></i>
                   ) : (
-                    <i className="iconoir-sun-light" style={{ color: '#ffbb00' }} ></i>
+                    <i className="iconoir-sun-light" style={{ color: '#ffbb00' }}></i>
                   )}
                 </div>
               </li>
@@ -509,7 +588,7 @@ const Header = () => {
                   aria-hidden={openPanel !== 'notifications'}
                 >
                   <div className="offcanvas-header">
-                    <h5 className="offcanvas-title">Notifications ({notifications.length})</h5>
+                    <h5 className="offcanvas-title">{t.notificationsTitle.replace('{count}', notifications.length)}</h5>
                     <button
                       className="btn-close"
                       onClick={closeOffcanvas}
@@ -519,7 +598,7 @@ const Header = () => {
                   <div className="offcanvas-body notification-offcanvas-body app-scroll p-0">
                     {notifications.length === 0 ? (
                       <div className="head-container notification-head-container p-3">
-                        <p className="text-muted">Aucune alerte pour le moment.</p>
+                        <p className="text-muted">{t.noAlerts}</p>
                       </div>
                     ) : (
                       notifications.map((notif, index) => (
@@ -573,7 +652,7 @@ const Header = () => {
                   href="#"
                   onClick={(e) => handleOpenClick(e, 'profile')}
                   role="button"
-                  aria-label="Open profile"
+                  aria-label="Ouvrir le profil"
                 >
                   <img
                     alt="avatar"
@@ -588,11 +667,11 @@ const Header = () => {
                   aria-hidden={openPanel !== 'profile'}
                 >
                   <div className="offcanvas-header">
-                    <h5 className="offcanvas-title">Profile</h5>
+                    <h5 className="offcanvas-title">{t.profileTitle}</h5>
                     <button
                       className="btn-close"
                       onClick={closeOffcanvas}
-                      aria-label="Close profile"
+                      aria-label="Fermer le profil"
                     ></button>
                   </div>
                   <div className="offcanvas-body app-scroll">
@@ -648,13 +727,13 @@ const Header = () => {
           <div className="modal-dialog">
             <div className="modal-content">
               <div className="modal-header">
-                <h5 className="modal-title">Update Task</h5>
+                <h5 className="modal-title">{t.updateTaskTitle}</h5>
                 <button type="button" className="btn-close" onClick={closeModal} />
               </div>
               <form onSubmit={handleUpdateTask}>
                 <div className="modal-body">
                   <div className="mb-3">
-                    <label className="form-label">Due Date</label>
+                    <label className="form-label">{t.dueDateLabel}</label>
                     <input
                       type="date"
                       className="form-control"
@@ -663,33 +742,33 @@ const Header = () => {
                     />
                   </div>
                   <div className="mb-3">
-                    <label className="form-label">Assigned To</label>
+                    <label className="form-label">{t.assignedToLabel}</label>
                     <select
                       className="form-control"
                       value={newAssignee}
                       onChange={(e) => setNewAssignee(e.target.value)}
                     >
-                      <option value="">Select a member</option>
+                      <option value="">{t.selectMember}</option>
                       {users.map((user) => (
                         <option key={user._id} value={user._id}>
                           {user.firstname} {user.lastname}{' '}
-                          {suggestedUser && suggestedUser.userId === user._id && '(Suggested By IA)'}
+                          {suggestedUser && suggestedUser.userId === user._id && t.suggestedByAI}
                         </option>
                       ))}
                     </select>
                     {suggestedUser && (
                       <p className="text-muted mt-1">
-                        AI thinks {suggestedUser.firstname} could help! (Assigned tasks: {suggestedUser.taskCount})
+                        {t.aiSuggestion.replace('{name}', suggestedUser.firstname).replace('{count}', suggestedUser.taskCount)}
                       </p>
                     )}
                   </div>
                 </div>
                 <div className="modal-footer">
                   <button type="button" className="btn btn-secondary" onClick={closeModal}>
-                    Cancel
+                    {t.cancelButton}
                   </button>
                   <button type="submit" className="btn btn-primary">
-                    Update
+                    {t.updateButton}
                   </button>
                 </div>
               </form>

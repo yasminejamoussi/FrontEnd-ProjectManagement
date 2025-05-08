@@ -8,6 +8,8 @@ import { useNavigate } from 'react-router-dom';
 import Header from "../Layout/Header";
 import SideBar from "../Layout/Sidebar";
 import UserProfileForm from "../Pages/UserProfileForm";
+import Avatar from '../../assets/images/avtar/user.jpg';
+import { Modal, Button } from 'react-bootstrap';
 
 const Profile = ({ userId }) => {
   const [activeTab, setActiveTab] = useState('profile-tab-pane');
@@ -16,17 +18,19 @@ const Profile = ({ userId }) => {
   const [cv, setCv] = useState(null);
   const [cvPreview, setCvPreview] = useState("");
   const [userData, setUserData] = useState(null);
-  const [notification, setNotification] = useState({ message: "", type: "" });
+  const [imageNotification, setImageNotification] = useState({ message: "", type: "" });
+  const [cvNotification, setCvNotification] = useState({ message: "", type: "" });
   const [isTwoFactorEnabled, setIsTwoFactorEnabled] = useState(false);
   const [loading2FA, setLoading2FA] = useState(false);
   const [error2FA, setError2FA] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const navigate = useNavigate();
 
   const fetchUserProfile = async () => {
     const token = localStorage.getItem("token");
     if (!token) {
       console.error("Token missing");
-      setNotification({ message: "You must be logged in.", type: "error" });
+      setImageNotification({ message: "You must be logged in.", type: "error" });
       return;
     }
 
@@ -42,7 +46,7 @@ const Profile = ({ userId }) => {
       console.log("Current skills:", response.data.skills);
     } catch (error) {
       console.error("Error fetching user data:", error);
-      setNotification({ message: "Failed to fetch user data.", type: "error" });
+      setImageNotification({ message: "Failed to fetch user data.", type: "error" });
     }
   };
 
@@ -56,20 +60,21 @@ const Profile = ({ userId }) => {
   };
 
   const handleCvChange = (e) => {
-    setCv(e.target.files[0]);
-    setCvPreview(e.target.files[0].name);
+    const selectedFile = e.target.files[0];
+    setCv(selectedFile);
+    setCvPreview(selectedFile ? selectedFile.name : "");
   };
 
   const handleUpload = async () => {
     if (!image) {
-      setNotification({ message: "Please select an image.", type: "error" });
+      setImageNotification({ message: "Please select an image.", type: "error" });
       return;
     }
 
     const token = localStorage.getItem("token");
     if (!token) {
       console.error("Token missing");
-      setNotification({ message: "You must be logged in.", type: "error" });
+      setImageNotification({ message: "You must be logged in.", type: "error" });
       return;
     }
 
@@ -85,23 +90,45 @@ const Profile = ({ userId }) => {
       });
 
       setPreview(response.data.imageUrl);
-      setNotification({ message: "Image uploaded successfully!", type: "success" });
+      setImageNotification({ message: "Image uploaded successfully!", type: "success" });
     } catch (error) {
       console.error("Error uploading image:", error);
-      setNotification({ message: "Failed to upload image.", type: "error" });
+      setImageNotification({ message: "Failed to upload image.", type: "error" });
+    }
+  };
+
+  const handleDeleteImage = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setImageNotification({ message: "You must be logged in.", type: "error" });
+      return;
+    }
+
+    try {
+      const response = await axios.delete("http://localhost:4000/api/profile/delete-image", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setPreview("");
+      setImage(null);
+      setImageNotification({ message: "Profile image deleted successfully!", type: "success" });
+      handleCloseDeleteModal();
+    } catch (error) {
+      console.error("Error deleting profile image:", error);
+      setImageNotification({ message: "Failed to delete profile image.", type: "error" });
     }
   };
 
   const handleCvUpload = async () => {
     if (!cv) {
-      setNotification({ message: "Please select a CV.", type: "error" });
+      setCvNotification({ message: "Please select a CV.", type: "error" });
       return;
     }
 
     const token = localStorage.getItem("token");
     if (!token) {
       console.error("Token missing");
-      setNotification({ message: "You must be logged in.", type: "error" });
+      setCvNotification({ message: "You must be logged in.", type: "error" });
       return;
     }
 
@@ -117,19 +144,20 @@ const Profile = ({ userId }) => {
       });
 
       console.log("Backend response after CV upload:", response.data);
-      setCvPreview(response.data.cvUrl);
-      setNotification({ message: response.data.message, type: "success" });
+      setCvPreview("");
+      setCv(null);
+      setCvNotification({ message: response.data.message, type: "success" });
       await fetchUserProfile();
     } catch (error) {
       console.error("Error uploading CV:", error);
-      setNotification({ message: "Failed to upload CV.", type: "error" });
+      setCvNotification({ message: "Failed to upload CV.", type: "error" });
     }
   };
 
   const handleToggle2FA = async () => {
     const token = localStorage.getItem("token");
     if (!token || !userData?.email) {
-      setNotification({ message: "You must be logged in with a valid email.", type: "error" });
+      setImageNotification({ message: "You must be logged in with a valid email.", type: "error" });
       return;
     }
 
@@ -138,7 +166,6 @@ const Profile = ({ userId }) => {
 
     try {
       if (!isTwoFactorEnabled) {
-        // Enable 2FA: Generate QR code
         const response = await axios.post(
           "http://localhost:4000/api/auth/generate-2fa",
           { email: userData.email },
@@ -146,7 +173,6 @@ const Profile = ({ userId }) => {
         );
 
         if (response.data.qrCode) {
-          // Store QR code and email, then navigate to verification page
           localStorage.setItem("qrCode", response.data.qrCode);
           localStorage.setItem("email", userData.email);
           navigate("/verify-2fa");
@@ -154,7 +180,6 @@ const Profile = ({ userId }) => {
           throw new Error("Failed to generate QR code.");
         }
       } else {
-        // Disable 2FA
         const response = await axios.post(
           "http://localhost:4000/api/auth/disable-2fa",
           { email: userData.email },
@@ -164,8 +189,8 @@ const Profile = ({ userId }) => {
         if (response.data.message) {
           setIsTwoFactorEnabled(false);
           setUserData({ ...userData, isTwoFactorEnabled: false });
-          setNotification({ message: "2FA disabled successfully!", type: "success" });
-          await fetchUserProfile(); // Refresh user data
+          setImageNotification({ message: "2FA disabled successfully!", type: "success" });
+          await fetchUserProfile();
         }
       }
     } catch (error) {
@@ -178,6 +203,12 @@ const Profile = ({ userId }) => {
 
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
+  };
+
+  const handleCloseDeleteModal = () => setShowDeleteModal(false);
+  const handleShowDeleteModal = () => setShowDeleteModal(true);
+  const handleConfirmDelete = () => {
+    handleDeleteImage();
   };
 
   return (
@@ -225,7 +256,6 @@ const Profile = ({ userId }) => {
                           <i className="ph-bold ph-shield-check pe-2"></i> Security
                         </button>
                       </li>
-                    
                     </ul>
                   </div>
                 </div>
@@ -235,7 +265,7 @@ const Profile = ({ userId }) => {
                     <h5>Skills</h5>
                   </div>
                   <div className="card-body">
-                    {userData && userData.skills && userData.skills.length > 0 ? (
+                    {userData?.skills?.length > 0 ? (
                       userData.skills.map((skill, index) => (
                         <div key={index} className="mb-4">
                           <h6 className="mb-1 text-dark">{skill}</h6>
@@ -249,9 +279,6 @@ const Profile = ({ userId }) => {
                                 className="progress-bar bg-primary h-5"
                                 role="progressbar"
                                 style={{ width: '100%' }}
-                                aria-valuenow="100"
-                                aria-valuemin="0"
-                                aria-valuemax="100"
                               ></div>
                             </div>
                           </div>
@@ -263,7 +290,7 @@ const Profile = ({ userId }) => {
                   </div>
                 </div>
               </div>
-
+              
               <div className="col-lg-8 col-xxl-9">
                 <div className="tab-content">
                   {activeTab === 'profile-tab-pane' && (
@@ -288,13 +315,34 @@ const Profile = ({ userId }) => {
                                       <i className="ti ti-photo-heart"></i>
                                     </label>
                                   </div>
-                                  <div className="avatar-preview">
-                                    {preview && (
-                                      <img
-                                        src={preview}
-                                        alt="Profile"
-                                        style={{ width: "120px", height: "120px", borderRadius: "50%" }}
-                                      />
+                                  <div className="avatar-preview" style={{ position: 'relative' }}>
+                                    <img
+                                      src={preview || Avatar}
+                                      alt="Profile"
+                                      style={{ width: "120px", height: "120px", borderRadius: "50%" }}
+                                    />
+                                    {preview && preview !== Avatar && (
+                                      <button 
+                                        onClick={handleShowDeleteModal}
+                                        style={{
+                                          position: 'absolute',
+                                          top: '0',
+                                          right: '0',
+                                          background: 'rgba(255, 0, 0, 0.7)',
+                                          border: 'none',
+                                          borderRadius: '50%',
+                                          width: '25px',
+                                          height: '25px',
+                                          color: 'white',
+                                          cursor: 'pointer',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                        }}
+                                        title="Delete profile image"
+                                      >
+                                        <i className="ti ti-trash" style={{ fontSize: '12px' }}></i>
+                                      </button>
                                     )}
                                   </div>
                                 </div>
@@ -302,50 +350,62 @@ const Profile = ({ userId }) => {
                                   <button onClick={handleUpload} className="btn btn-primary mt-4">
                                     Upload Image
                                   </button>
+                               
                                 </div>
                               </div>
+                              {imageNotification.message && (
+                                    <div
+                                      className={`alert alert-${imageNotification.type === "success" ? "success" : "danger"} mt-3`}
+                                      role="alert"
+                                      style={{ textAlign: "center" }}
+                                    >
+                                      {imageNotification.message}
+                                    </div>
+                                  )}
                             </div>
 
                             {/* Section Upload CV */}
                             <div className="cv-upload mt-4">
                               <h6>Upload CV</h6>
-                              <div className="avatar-upload" style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                                <div className="avatar-edit" style={{ position: "relative", marginBottom: "10px" }}>
-                                  <input
-                                    type="file"
-                                    id="cvUpload"
-                                    accept=".pdf,.docx"
-                                    onChange={handleCvChange}
-                                    style={{ display: "none" }}
-                                  />
-                                  <label
-                                    htmlFor="cvUpload"
-                                    style={{
-                                      cursor: "pointer",
-                                      padding: "10px 20px",
-                                      backgroundColor: "#f0f0f0",
-                                      borderRadius: "5px",
-                                      border: "1px solid #ddd",
-                                      display: "inline-block",
-                                      letterSpacing: "normal",
-                                      whiteSpace: "nowrap",
-                                    }}
-                                  >
-                                    <i className="ti ti-file-upload me-2"></i>Choose a CV
-                                  </label>
-                                </div>
-                                <div className="text-center">
-                                  <button onClick={handleCvUpload} className="btn btn-primary mt-2">
-                                    Upload CV
-                                  </button>
-                                </div>
-                              </div>
-                              {notification.message && (
-                                <div
-                                  className={`alert alert-${notification.type === "success" ? "success" : "danger"} mt-3`}
-                                  role="alert"
+                              <div
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "center",
+                                  alignItems: "center",
+                                  gap: "15px",
+                                  marginTop: "10px",
+                                  flexWrap: "wrap",
+                                }}
+                              >
+                                <input
+                                  type="file"
+                                  id="cvUpload"
+                                  accept=".pdf,.docx"
+                                  onChange={handleCvChange}
+                                  style={{ display: "none" }}
+                                />
+                                <button
+                                  className="btn btn-light"
+                                  onClick={() => document.getElementById("cvUpload").click()}
+                                  style={{ padding: "10px 20px" }}
                                 >
-                                  {notification.message}
+                                  <i className="ti ti-file-upload me-2"></i>Choose a CV
+                                </button>
+                                <button
+                                  onClick={handleCvUpload}
+                                  className="btn btn-primary"
+                                  style={{ padding: "10px 20px" }}
+                                >
+                                  Upload CV
+                                </button>
+                              </div>
+                              {cvNotification.message && (
+                                <div
+                                  className={`alert alert-${cvNotification.type === "success" ? "success" : "danger"} mt-3`}
+                                  role="alert"
+                                  style={{ textAlign: "center" }}
+                                >
+                                  {cvNotification.message}
                                 </div>
                               )}
                             </div>
@@ -495,11 +555,24 @@ const Profile = ({ userId }) => {
           </div>
         </main>
 
-        <div className="go-top">
-          <span className="progress-value">
-            <i className="ti ti-arrow-up"></i>
-          </span>
-        </div>
+
+        {/* Modal de suppression */}
+        <Modal show={showDeleteModal} onHide={handleCloseDeleteModal} centered>
+          <Modal.Body className="text-center">
+            <div className="mb-3" style={{ marginTop: "-30px" }}>
+              <i className="ti ti-trash text-danger" style={{ fontSize: "40px" }}></i>
+            </div>
+            <h4 className="text-danger f-w-600">Are you sure you want to delete your profile picture?</h4>
+            <div className="mt-3">
+              <Button variant="secondary" onClick={handleCloseDeleteModal} className="me-2">
+                Cancel
+              </Button>
+              <Button variant="danger" onClick={handleConfirmDelete}>
+                Delete
+              </Button>
+            </div>
+          </Modal.Body>
+        </Modal>
       </div>
 
       <div id="customizer"></div>

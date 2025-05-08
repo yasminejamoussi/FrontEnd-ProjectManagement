@@ -3,60 +3,69 @@ import { NavLink, useLocation } from 'react-router-dom';
 import LogoNoir from '../../assets/images/logo/LogoNoir.png';
 import LogoBlanc from '../../assets/images/logo/LogoBlanc.png';
 import { jwtDecode } from "jwt-decode";
+import { HiMenu, HiX, HiSun, HiMoon } from 'react-icons/hi';
+import { RiDashboardLine, RiFolderLine, RiTaskLine, RiNotification2Line, RiEyeLine, RiLockLine } from 'react-icons/ri';
 
 const menuConfig = {
   dashboard: {
     label: 'Dashboard',
     path: '/dashboard',
-    icon: 'iconoir-home-alt',
+    icon: <RiDashboardLine />,
     roles: ['Admin', 'Project Manager', 'Team Leader', 'Team Member', 'Guest'],
     paths: ['/dashboard', '/'],
   },
   projects: {
     label: 'Project Management',
-    icon: 'iconoir-folder', 
+    icon: <RiFolderLine />,
     roles: ['Admin', 'Project Manager', 'Team Leader', 'Team Member', 'Guest'],
-    paths: ['/projects','/team'],
+    paths: ['/projects', '/team'],
     subItems: [
       { label: 'Projects', path: '/projects' },
-      { label: 'Teams', path: '/team' }] ,
+      { label: 'Teams', path: '/team' }
+    ],
   },
   tasks: {
     label: 'Task Management',
-    icon: 'iconoir-task-list',
+    icon: <RiTaskLine />,
     roles: ['Admin', 'Project Manager', 'Team Leader', 'Team Member', 'Guest'],
     paths: ['/tasksusers'],
     subItems: [{ label: 'Tasks', path: '/tasksusers' }],
   },
   notifications: {
     label: 'Smart Notifications',
-    icon: 'iconoir-bell',
+    icon: <RiNotification2Line />,
     roles: ['Admin', 'Project Manager', 'Team Leader', 'Team Member'],
     paths: ['/notifications'],
     subItems: [{ label: 'Notifications', path: '/notifications' }],
   },
   activity: {
     label: 'Activity Log',
-    icon: 'iconoir-eye',
+    icon: <RiEyeLine />,
     roles: ['Admin', 'Project Manager', 'Team Leader'],
     paths: ['/activitylogs'],
     subItems: [{ label: 'Activity History', path: '/activitylogs' }],
   },
   auth: {
     label: 'User Management',
-    icon: 'iconoir-lock',
+    icon: <RiLockLine />,
     roles: ['Admin'],
-    paths: ['/roles','users'],
+    paths: ['/roles', 'users'],
     subItems: [
       { label: 'Roles', path: '/roles' },
-    { label: 'Users', path: '/users' }],
+      { label: 'Users', path: '/users' }
+    ],
   },
 };
 
-const Sidebar = () => {
+const Sidebar = ({ setContentMargin }) => {
   const [userRole, setUserRole] = useState(null);
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const savedMode = localStorage.getItem('isDarkMode');
+    return savedMode ? JSON.parse(savedMode) : false;
+  });
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    return window.innerWidth >= 768;
+  });
   const [openMenus, setOpenMenus] = useState({});
   const location = useLocation();
 
@@ -66,29 +75,46 @@ const Sidebar = () => {
       try {
         const decoded = jwtDecode(jwtToken);
         console.log("✅ Token décodé :", decoded);
-        setUserRole(decoded?.role || 'Guest'); 
+        setUserRole(decoded?.role || 'Guest');
       } catch (error) {
         console.error("Erreur lors du décodage du token JWT", error);
       }
     }
+
+    localStorage.setItem('isDarkMode', JSON.stringify(isDarkMode));
+  }, [isDarkMode]);
+
+  useEffect(() => {
+    if (setContentMargin) {
+      setContentMargin(isSidebarOpen ? 280 : 0);
+    }
+  }, [isSidebarOpen, setContentMargin]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsSidebarOpen(window.innerWidth >= 768);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Filtrage des menus selon le rôle
   const filteredMenu = useMemo(() => {
     return Object.entries(menuConfig).filter(([_, config]) => config.roles.includes(userRole));
   }, [userRole]);
 
-  // Styles
   const styles = {
     sidebar: {
       position: 'fixed',
+      top: 0,
+      left: 0,
       width: isSidebarOpen ? '280px' : '0',
       height: '100vh',
       boxShadow: isSidebarOpen ? '5px 0 15px rgba(0, 0, 0, 0.1)' : 'none',
       borderRadius: '0',
-      overflowY: 'auto', // Keep content scrollable
-      scrollbarWidth: 'none', // For Firefox
-      msOverflowStyle: 'none', // For IE/Edge
+      overflowY: 'auto',
+      scrollbarWidth: 'none',
+      msOverflowStyle: 'none',
       background: isDarkMode
         ? 'linear-gradient(135deg, #1f2a44 0%, #141b2d 100%)'
         : 'linear-gradient(135deg, #ffffff 0%, #f5f5f5 100%)',
@@ -98,25 +124,30 @@ const Sidebar = () => {
       transition: 'width 0.3s ease',
       zIndex: 1050,
       '&::-webkit-scrollbar': {
-        display: 'none', // For WebKit browsers (Chrome, Safari)
+        display: 'none',
       },
     },
-    toggleButton: {
+    overlay: {
+      display: isSidebarOpen && window.innerWidth < 768 ? 'block' : 'none',
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      width: '100vw',
+      height: '100vh',
+      background: 'rgba(0, 0, 0, 0.5)',
+      zIndex: 1049,
+      cursor: 'pointer',
+    },
+    toggleLink: {
       position: 'fixed',
       top: '15px',
       left: '15px',
-      width: '30px',
-      height: '30px',
-      borderRadius: '8px',
-      backgroundColor: isDarkMode ? '#2e4a66' : '#e0e7f2',
-      color: isDarkMode ? '#ffffff' : '#000',
       alignItems: 'center',
       justifyContent: 'center',
       cursor: 'pointer',
       transition: 'all 0.3s ease',
       zIndex: 1051,
-      border: `1px solid ${isDarkMode ? '#ffffff20' : '#00000020'}`,
-      display: window.innerWidth < 768 ? 'flex' : 'none', // Only show on mobile
+      textDecoration: 'none',
     },
     logoContainer: {
       padding: '20px',
@@ -194,10 +225,8 @@ const Sidebar = () => {
     activity: { backgroundColor: isDarkMode ? '#3e6654' : '#e0f2e9' },
     auth: { backgroundColor: isDarkMode ? '#5e3f7a' : '#f2e0f7' },
     role: { backgroundColor: isDarkMode ? '#3b5998' : '#cce6ff' },
-
   };
 
-  // Toggle menu open/close
   const toggleMenu = (menuId) => {
     setOpenMenus((prev) => ({
       ...prev,
@@ -210,7 +239,6 @@ const Sidebar = () => {
     [location.pathname]
   );
 
-  // Render a menu item with sub-items
   const renderMenuItem = (menuId, config) => {
     const hasSubItems = !!config.subItems;
     const isOpen = openMenus[menuId] || isMenuOpenByDefault(menuId);
@@ -226,10 +254,16 @@ const Sidebar = () => {
                 ...(isParentActive ? styles.activeLink : {}),
               }}
               onClick={() => toggleMenu(menuId)}
-              onMouseEnter={(e) => (e.currentTarget.querySelector('i').style.transform = 'scale(1.2)')}
-              onMouseLeave={(e) => (e.currentTarget.querySelector('i').style.transform = 'scale(1)')}
+              onMouseEnter={(e) => {
+                const icon = e.currentTarget.querySelector('svg');
+                if (icon) icon.style.transform = 'scale(1.2)';
+              }}
+              onMouseLeave={(e) => {
+                const icon = e.currentTarget.querySelector('svg');
+                if (icon) icon.style.transform = 'scale(1)';
+              }}
             >
-              <i className={config.icon} style={styles.icon}></i>
+              <span style={styles.icon}>{config.icon}</span>
               {config.label}
             </a>
             <ul style={{ ...styles.subMenu, maxHeight: isOpen ? '500px' : '0', opacity: isOpen ? 1 : 0 }}>
@@ -255,10 +289,16 @@ const Sidebar = () => {
               ...styles.menuLink,
               ...(isActive ? styles.activeLink : {}),
             })}
-            onMouseEnter={(e) => (e.currentTarget.querySelector('i').style.transform = 'scale(1.2)')}
-            onMouseLeave={(e) => (e.currentTarget.querySelector('i').style.transform = 'scale(1)')}
+            onMouseEnter={(e) => {
+              const icon = e.currentTarget.querySelector('svg');
+              if (icon) icon.style.transform = 'scale(1.2)';
+            }}
+            onMouseLeave={(e) => {
+              const icon = e.currentTarget.querySelector('svg');
+              if (icon) icon.style.transform = 'scale(1)';
+            }}
           >
-            <i className={config.icon} style={styles.icon}></i>
+            <span style={styles.icon}>{config.icon}</span>
             {config.label}
           </NavLink>
         )}
@@ -266,16 +306,22 @@ const Sidebar = () => {
     );
   };
 
+  const handleOverlayClick = () => {
+    setIsSidebarOpen(false);
+  };
+
   return (
     <>
-      <button
-        style={styles.toggleButton}
-        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.1)')}
-        onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+      <div style={styles.overlay} onClick={handleOverlayClick}></div>
+      <a
+        href="#"
+        style={styles.toggleLink}
+        onClick={(e) => { e.preventDefault(); setIsSidebarOpen(!isSidebarOpen); }}
+        onMouseEnter={(e) => (e.currentTarget.querySelector('svg').style.transform = 'scale(1.1)')}
+        onMouseLeave={(e) => (e.currentTarget.querySelector('svg').style.transform = 'scale(1)')}
       >
-        <i className={isSidebarOpen ? 'iconoir-xmark' : 'iconoir-menu'} style={styles.icon}></i>
-      </button>
+        {isSidebarOpen ? <HiX size={20} color={isDarkMode ? '#ffffff' : '#000'} /> : <HiMenu size={20} />}
+      </a>
       <nav style={styles.sidebar}>
         <div style={styles.logoContainer}>
           <NavLink to="/" style={styles.logo}>
@@ -290,10 +336,16 @@ const Sidebar = () => {
         <div
           style={styles.themeButton}
           onClick={() => setIsDarkMode(!isDarkMode)}
-          onMouseEnter={(e) => (e.currentTarget.querySelector('i').style.transform = 'scale(1.2)')}
-          onMouseLeave={(e) => (e.currentTarget.querySelector('i').style.transform = 'scale(1)')}
+          onMouseEnter={(e) => {
+            const icon = e.currentTarget.querySelector('svg');
+            if (icon) icon.style.transform = 'scale(1.2)';
+          }}
+          onMouseLeave={(e) => {
+            const icon = e.currentTarget.querySelector('svg');
+            if (icon) icon.style.transform = 'scale(1)';
+          }}
         >
-          <i className={isDarkMode ? 'iconoir-sun-light' : 'iconoir-half-moon'} style={styles.icon}></i>
+          {isDarkMode ? <HiSun size={20} style={styles.icon} /> : <HiMoon size={20} style={styles.icon} />}
           {isDarkMode ? 'Light Mode' : 'Dark Mode'}
         </div>
       </nav>

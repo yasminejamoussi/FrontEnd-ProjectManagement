@@ -16,7 +16,7 @@ import "./assets/vendor/prism/prism.min.css";
 import "./assets/vendor/simplebar/simplebar.css";
 import "./assets/css/style.css"; // Style.css après
 import "./assets/css/responsive.css"; // Responsive.css en dernier
-
+import './i18n';
 
 
 createRoot(document.getElementById('root')).render(

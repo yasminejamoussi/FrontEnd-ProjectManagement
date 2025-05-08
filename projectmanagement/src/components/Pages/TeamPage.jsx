@@ -26,6 +26,7 @@ const TeamPage = () => {
     const [showModal, setShowModal] = useState(false);
     const [selectedWeek, setSelectedWeek] = useState(null);
     const [errorMessage, setErrorMessage] = useState(null);
+    const [showHallOfFame, setShowHallOfFame] = useState(false);
 
     const badgeDescriptions = {
         "Task Master": "Assigned the highest number of tasks in this project.",
@@ -167,7 +168,7 @@ const TeamPage = () => {
                 headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
             });
             setBestProjectManager(response.data.bestProjectManager);
-            setErrorMessage(null); // Clear any previous errors
+            setErrorMessage(null);
         } catch (error) {
             console.error("Detailed error fetching best project manager:", {
                 message: error.message,
@@ -225,8 +226,8 @@ const TeamPage = () => {
                 } else {
                     filteredProjects = projectResponse.data.filter(
                         (project) =>
-                            project.projectManager?._id?.toString() === userId ||
-                            project.teamMembers?.some((member) => member?._id?.toString() === userId)
+                            project.projectManager?._id.toString() === userId ||
+                            project.teamMembers?.some((member) => member._id.toString() === userId)
                     );
                 }
 
@@ -389,6 +390,8 @@ const TeamPage = () => {
 
     const handleTabClick = (tab) => setActiveTab(tab);
 
+    const toggleHallOfFame = () => setShowHallOfFame(!showHallOfFame);
+
     return (
         <div className="app-wrapper">
             <Header />
@@ -398,17 +401,29 @@ const TeamPage = () => {
                     <div className="container-fluid">
                         <div className="row m-1">
                             <div className="col-12">
-                                <h4 className="main-title">Team</h4>
+                                <div className="title-container">
+                                    <h4 className="main-title">Team</h4>
+                                    {(userRole === "Admin" || userRole === "Project Manager" || userRole === "Team Leader") && (
+                                        <button
+                                            className="btn btn-primary d-flex align-items-center"
+                                            onClick={toggleHallOfFame}
+                                            style={{ backgroundColor: 'var(--primary)', borderColor: 'var(--primary)', color: '#fff' }}
+                                        >
+                                            <i className="ph-duotone ph-trophy f-s-18 me-2"></i>
+                                            {showHallOfFame ? "Hide Hall of Fame" : "Discover Hall of Fame"}
+                                        </button>
+                                    )}
+                                </div>
                                 <ul className="app-line-breadcrumbs mb-3">
                                     <li>
-                                        <a href="#" className="f-s-14 f-w-500">
+                                        <a href="#" className="f-s-12 f-w-500">
                                             <span>
                                                 <i className="ph-duotone ph-stack f-s-16"></i> Applications
                                             </span>
                                         </a>
                                     </li>
                                     <li className="active">
-                                        <a href="#" className="f-s-14 f-w-500">
+                                        <a href="#" className="f-s-12 f-w-500">
                                             Team
                                         </a>
                                     </li>
@@ -416,19 +431,175 @@ const TeamPage = () => {
                             </div>
                         </div>
 
-                        <div className="row mb-3">
-                            <div className="col-12">
-                                <button
-                                    className="btn btn-primary d-flex align-items-center"
-                                    data-bs-toggle="modal"
-                                    data-bs-target="#weekSelectionModal"
-                                    onClick={() => setShowModal(true)}
-                                >
-                                    <i className="ph-duotone ph-calendar me-2"></i>
-                                    Select Week to View Best Performers
-                                </button>
+                        {(userRole === "Admin" || userRole === "Project Manager" || userRole === "Team Leader") && (
+                            <div className={`hall-of-fame-card card shadow-sm ${showHallOfFame ? "open" : ""}`}>
+                                {showHallOfFame && (
+                                    <>
+                                        <div className="confetti" style={{ left: "5%", animationDelay: "0s" }}></div>
+                                        <div className="confetti" style={{ left: "15%", animationDelay: "0.1s" }}></div>
+                                        <div className="confetti" style={{ left: "25%", animationDelay: "0.2s" }}></div>
+                                        <div className="confetti" style={{ left: "35%", animationDelay: "0.3s" }}></div>
+                                        <div className="confetti" style={{ left: "45%", animationDelay: "0.4s" }}></div>
+                                        <div className="confetti" style={{ left: "55%", animationDelay: "0.5s" }}></div>
+                                        <div className="confetti" style={{ left: "65%", animationDelay: "0.6s" }}></div>
+                                        <div className="confetti" style={{ left: "75%", animationDelay: "0.7s" }}></div>
+                                        <div className="confetti" style={{ left: "85%", animationDelay: "0.8s" }}></div>
+                                        <div className="confetti" style={{ left: "95%", animationDelay: "0.9s" }}></div>
+                                    </>
+                                )}
+                                {showHallOfFame && (
+                                    <div className="row mb-2">
+                                        <div className="col-12 text-center">
+                                            <button
+                                                className="btn btn-outline-primary btn-sm rounded-pill"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#weekSelectionModal"
+                                                onClick={() => setShowModal(true)}
+                                            >
+                                                <i className="ph-duotone ph-calendar f-s-16 me-2"></i>
+                                                Select Week to View Best Performers
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="row">
+                                    <div className="col-12">
+                                        <div className="hof-cards-container">
+                                            {bestUser ? (
+                                                <div className="hof-best-user-card card shadow-sm">
+                                                    <div className="card-body d-flex align-items-center">
+                                                        <div className="best-user-image me-3 position-relative">
+                                                            <img
+                                                                src={bestUser.profileImage || DefaultAvatar}
+                                                                alt={`${bestUser.firstname} ${bestUser.lastname}`}
+                                                                className="profile-image img-fluid"
+                                                            />
+                                                            <div className="badges position-absolute bottom-0 end-0">
+                                                                {bestUser.badges.map((badge, idx) => (
+                                                                    <img
+                                                                        key={idx}
+                                                                        src={badgeImages[badge]}
+                                                                        alt={badge}
+                                                                        className="best-performer-badge"
+                                                                        data-bs-toggle="tooltip"
+                                                                        data-bs-placement="top"
+                                                                        title={badgeDescriptions[badge]}
+                                                                    />
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <h5 className="card-title d-flex align-items-center font-weight-bold">
+                                                                <i className="ph-duotone ph-trophy f-s-16 me-2 text-warning"></i>
+                                                                Best Performer Across {userRole === "Admin" ? "All Projects" : "Your Projects"}
+                                                            </h5>
+                                                            <p className="text-black">
+                                                                {bestUser.firstname} {bestUser.lastname} ({bestUser.role})
+                                                            </p>
+                                                            <p className="text-black">Score: {bestUser.score.toFixed(2)}</p>
+                                                            <p className="text-black">Tasks Completed: {bestUser.taskCount}</p>
+                                                            <p className="text-black d-flex align-items-center">
+                                                                <i
+                                                                    className="ph-duotone ph-clock f-s-16 me-2 text-danger"
+                                                                    data-bs-toggle="tooltip"
+                                                                    data-bs-placement="top"
+                                                                    title="Number of tasks overdue, impacting the score by -2 per task"
+                                                                ></i>
+                                                                Overdue Tasks: {bestUser.overdueTasks || 0}
+                                                            </p>
+                                                            <p className="text-black d-flex align-items-center">
+                                                                <i
+                                                                    className="ph-duotone ph-star f-s-16 me-2 text-success"
+                                                                    data-bs-toggle="tooltip"
+                                                                    data-bs-placement="top"
+                                                                    title="New tasks assigned this week, adding +1 to the score per task"
+                                                                ></i>
+                                                                New Tasks Assigned: {bestUser.newlyAssignedTasks || 0}
+                                                            </p>
+                                                            <p className="text-muted">
+                                                                Week: {weekStart} to {weekEnd}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ) : weekStart ? (
+                                                <div className="hof-best-user-card card shadow-sm">
+                                                    <div className="card-body">
+                                                        <p className="text-black">No best performer across {userRole === "Admin" ? "all projects" : "your projects"} for this week.</p>
+                                                        <p className="text-muted">
+                                                            Week: {weekStart} to {weekEnd}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="hof-best-user-card card shadow-sm">
+                                                    <div className="card-body">
+                                                        <p className="text-black">Loading best performer across {userRole === "Admin" ? "all projects" : "your projects"}...</p>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {userRole === "Admin" && (
+                                                bestProjectManager ? (
+                                                    <div className="hof-best-user-card card shadow-sm">
+                                                        <div className="card-body d-flex align-items-center">
+                                                            <div className="best-user-image me-3 position-relative">
+                                                                <img
+                                                                    src={bestProjectManager.profileImage || DefaultAvatar}
+                                                                    alt={`${bestProjectManager.firstname} ${bestProjectManager.lastname}`}
+                                                                    className="profile-image img-fluid"
+                                                                />
+                                                                <div className="badges position-absolute bottom-0 end-0">
+                                                                    <img
+                                                                        src={PillarBadge}
+                                                                        alt="Project Pillar"
+                                                                        className="best-performer-badge"
+                                                                        data-bs-toggle="tooltip"
+                                                                        data-bs-placement="top"
+                                                                        title="Top Project Manager"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                            <div>
+                                                                <h5 className="card-title d-flex align-items-center font-weight-bold">
+                                                                    <i className="ph-duotone ph-crown f-s-16 me-2 text-warning"></i>
+                                                                    Best Project Manager Across All Projects
+                                                                </h5>
+                                                                <p className="text-black">
+                                                                    {bestProjectManager.firstname} {bestProjectManager.lastname} (Project Manager)
+                                                                </p>
+                                                                <p className="text-black">Managed Projects: {bestProjectManager.managedProjectsCount}</p>
+                                                                <p className="text-black">Risk Rate: {bestProjectManager.atRiskPercentage}%</p>
+                                                                <p className="text-black">Completion Rate: {bestProjectManager.completionRate}%</p>
+                                                                <p className="text-black">Score: {bestProjectManager.score}</p>
+                                                                <p className="text-muted">
+                                                                    Week: {weekStart} to {weekEnd}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ) : weekStart ? (
+                                                    <div className="hof-best-user-card card shadow-sm">
+                                                        <div className="card-body">
+                                                            <p className="text-black">No best project manager across all projects for this week.</p>
+                                                            <p className="text-muted">
+                                                                Week: {weekStart} to {weekEnd}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="hof-best-user-card card shadow-sm">
+                                                        <div className="card-body">
+                                                            <p className="text-black">Loading best project manager across all projects...</p>
+                                                        </div>
+                                                    </div>
+                                                )
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                         <div
                             className="modal fade"
@@ -467,16 +638,9 @@ const TeamPage = () => {
                                     <div className="modal-footer">
                                         <button
                                             type="button"
-                                            className="btn btn-secondary"
+                                            className="btn btn-primary"
                                             data-bs-dismiss="modal"
                                             onClick={() => setShowModal(false)}
-                                        >
-                                            Close
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="btn btn-primary"
-                                            onClick={handleWeekSelect}
                                         >
                                             Confirm
                                         </button>
@@ -493,173 +657,6 @@ const TeamPage = () => {
                                     </div>
                                 </div>
                             </div>
-                        )}
-
-                        {(userRole === "Admin" || userRole === "Project Manager" || userRole === "Team Leader") && (
-                            bestUser ? (
-                                <div className="row mb-4">
-                                    <div className="col-12">
-                                        <div className="best-user-card card shadow-sm">
-                                            <div className="card-body d-flex align-items-center">
-                                                <div className="best-user-image me-3 position-relative">
-                                                    <img
-                                                        src={bestUser.profileImage || DefaultAvatar}
-                                                        alt={`${bestUser.firstname} ${bestUser.lastname}`}
-                                                        className="img-fluid rounded-circle"
-                                                        style={{ width: "80px", height: "80px" }}
-                                                    />
-                                                    <div className="badges position-absolute" style={{ bottom: "0", right: "0" }}>
-                                                        {bestUser.badges.map((badge, idx) => (
-                                                            <img
-                                                                key={idx}
-                                                                src={badgeImages[badge]}
-                                                                alt={badge}
-                                                                className="best-performer-badge"
-                                                                style={{ width: "30px", height: "30px", marginLeft: "-10px" }}
-                                                                data-bs-toggle="tooltip"
-                                                                data-bs-placement="top"
-                                                                title={badgeDescriptions[badge]}
-                                                            />
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <h5 className="card-title mb-1 d-flex align-items-center">
-                                                        <i className="ph-duotone ph-trophy f-s-20 me-2 text-warning"></i>
-                                                        Best Performer Across {userRole === "Admin" ? "All Projects" : "Your Projects"}
-                                                    </h5>
-                                                    <p className="mb-1">
-                                                        <strong>
-                                                            {bestUser.firstname} {bestUser.lastname}
-                                                        </strong>{" "}
-                                                        ({bestUser.role})
-                                                    </p>
-                                                    <p className="mb-1">Score: {bestUser.score.toFixed(2)}</p>
-                                                    <p className="mb-1">Tasks Completed: {bestUser.taskCount}</p>
-                                                    <p className="mb-1 d-flex align-items-center">
-                                                        <i
-                                                            className="ph-duotone ph-clock f-s-16 me-2 text-danger"
-                                                            data-bs-toggle="tooltip"
-                                                            data-bs-placement="top"
-                                                            title="Number of tasks overdue, impacting the score by -2 per task"
-                                                        ></i>
-                                                        Overdue Tasks: {bestUser.overdueTasks || 0}
-                                                    </p>
-                                                    <p className="mb-1 d-flex align-items-center">
-                                                        <i
-                                                            className="ph-duotone ph-star f-s-16 me-2 text-success"
-                                                            data-bs-toggle="tooltip"
-                                                            data-bs-placement="top"
-                                                            title="New tasks assigned this week, adding +1 to the score per task"
-                                                        ></i>
-                                                        New Tasks Assigned: {bestUser.newlyAssignedTasks || 0}
-                                                    </p>
-                                                    <p className="text-muted">
-                                                        Week: {weekStart} to {weekEnd}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : weekStart ? (
-                                <div className="row mb-4">
-                                    <div className="col-12">
-                                        <div className="best-user-card card shadow-sm">
-                                            <div className="card-body">
-                                                <p className="text-muted">No best performer across {userRole === "Admin" ? "all projects" : "your projects"} for this week.</p>
-                                                <p className="text-muted">
-                                                    Week: {weekStart} to {weekEnd}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="row mb-4">
-                                    <div className="col-12">
-                                        <div className="best-user-card card shadow-sm">
-                                            <div className="card-body">
-                                                <p className="text-muted">Loading best performer across {userRole === "Admin" ? "all projects" : "your projects"}...</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            )
-                        )}
-
-                        {userRole === "Admin" && (
-                            bestProjectManager ? (
-                                <div className="row mb-4">
-                                    <div className="col-12">
-                                        <div className="best-user-card card shadow-sm">
-                                            <div className="card-body d-flex align-items-center">
-                                                <div className="best-user-image me-3 position-relative">
-                                                    <img
-                                                        src={bestProjectManager.profileImage || DefaultAvatar}
-                                                        alt={`${bestProjectManager.firstname} ${bestProjectManager.lastname}`}
-                                                        className="img-fluid rounded-circle"
-                                                        style={{ width: "80px", height: "80px" }}
-                                                    />
-                                                    <div className="badges position-absolute" style={{ bottom: "0", right: "0" }}>
-                                                        <img
-                                                            src={PillarBadge}
-                                                            alt="Project Pillar"
-                                                            className="best-performer-badge"
-                                                            style={{ width: "30px", height: "30px", marginLeft: "-10px" }}
-                                                            data-bs-toggle="tooltip"
-                                                            data-bs-placement="top"
-                                                            title="Top Project Manager"
-                                                        />
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <h5 className="card-title mb-1 d-flex align-items-center">
-                                                        <i className="ph-duotone ph-crown f-s-20 me-2 text-warning"></i>
-                                                        Best Project Manager Across All Projects
-                                                    </h5>
-                                                    <p className="mb-1">
-                                                        <strong>
-                                                            {bestProjectManager.firstname} {bestProjectManager.lastname}
-                                                        </strong>{" "}
-                                                        (Project Manager)
-                                                    </p>
-                                                    <p className="mb-1">Managed Projects: {bestProjectManager.managedProjectsCount}</p>
-                                                    <p className="mb-1">Risk Rate: {bestProjectManager.atRiskPercentage}%</p>
-                                                    <p className="mb-1">Completion Rate: {bestProjectManager.completionRate}%</p>
-                                                    <p className="mb-1">Score: {bestProjectManager.score}</p>
-                                                    <p className="text-muted">
-                                                        Week: {weekStart} to {weekEnd}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : weekStart ? (
-                                <div className="row mb-4">
-                                    <div className="col-12">
-                                        <div className="best-user-card card shadow-sm">
-                                            <div className="card-body">
-                                                <p className="text-muted">No best project manager across all projects for this week.</p>
-                                                <p className="text-muted">
-                                                    Week: {weekStart} to {weekEnd}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="row mb-4">
-                                    <div className="col-12">
-                                        <div className="best-user-card card shadow-sm">
-                                            <div className="card-body">
-                                                <p className="text-muted">Loading best project manager across all projects...</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            )
                         )}
 
                         <div className="row">
@@ -698,24 +695,22 @@ const TeamPage = () => {
                                                         <div className="card-body">
                                                             {bestUserForProject ? (
                                                                 <div className="row mb-4">
-                                                                    <div className="col-12">
-                                                                        <div className="best-user-card card shadow-sm">
+                                                                    <div className="col-12 d-flex justify-content-center">
+                                                                        <div className="best-user-card card shadow-sm" style={{ border: '1px solid #ffd700', borderRadius: '12px' }}>
                                                                             <div className="card-body d-flex align-items-center">
                                                                                 <div className="best-user-image me-3 position-relative">
                                                                                     <img
                                                                                         src={bestUserForProject.profileImage || DefaultAvatar}
                                                                                         alt={`${bestUserForProject.firstname} ${bestUserForProject.lastname}`}
-                                                                                        className="img-fluid rounded-circle"
-                                                                                        style={{ width: "80px", height: "80px" }}
+                                                                                        className="profile-image img-fluid"
                                                                                     />
-                                                                                    <div className="badges position-absolute" style={{ bottom: "0", right: "0" }}>
+                                                                                    <div className="badges position-absolute bottom-0 end-0">
                                                                                         {bestUserForProject.badges.map((badge, idx) => (
                                                                                             <img
                                                                                                 key={idx}
                                                                                                 src={badgeImages[badge]}
                                                                                                 alt={badge}
                                                                                                 className="best-performer-badge"
-                                                                                                style={{ width: "30px", height: "30px", marginLeft: "-10px" }}
                                                                                                 data-bs-toggle="tooltip"
                                                                                                 data-bs-placement="top"
                                                                                                 title={badgeDescriptions[badge]}
@@ -724,19 +719,16 @@ const TeamPage = () => {
                                                                                     </div>
                                                                                 </div>
                                                                                 <div>
-                                                                                    <h5 className="card-title mb-1 d-flex align-items-center">
-                                                                                        <i className="ph-duotone ph-trophy f-s-20 me-2 text-warning"></i>
+                                                                                    <h5 className="card-title d-flex align-items-center font-weight-bold">
+                                                                                        <i className="ph-duotone ph-trophy f-s-16 me-2 text-warning"></i>
                                                                                         Best Performer for {project.name}
                                                                                     </h5>
-                                                                                    <p className="mb-1">
-                                                                                        <strong>
-                                                                                            {bestUserForProject.firstname} {bestUserForProject.lastname}
-                                                                                        </strong>{" "}
-                                                                                        ({bestUserForProject.role})
+                                                                                    <p className="text-black">
+                                                                                        {bestUserForProject.firstname} {bestUserForProject.lastname} ({bestUserForProject.role})
                                                                                     </p>
-                                                                                    <p className="mb-1">Score: {bestUserForProject.score.toFixed(2)}</p>
-                                                                                    <p className="mb-1">Tasks Completed: {bestUserForProject.taskCount}</p>
-                                                                                    <p className="mb-1 d-flex align-items-center">
+                                                                                    <p className="text-black">Score: {bestUserForProject.score.toFixed(2)}</p>
+                                                                                    <p className="text-black">Tasks Completed: {bestUserForProject.taskCount}</p>
+                                                                                    <p className="text-black d-flex align-items-center">
                                                                                         <i
                                                                                             className="ph-duotone ph-clock f-s-16 me-2 text-danger"
                                                                                             data-bs-toggle="tooltip"
@@ -745,7 +737,7 @@ const TeamPage = () => {
                                                                                         ></i>
                                                                                         Overdue Tasks: {bestUserForProject.overdueTasks || 0}
                                                                                     </p>
-                                                                                    <p className="mb-1 d-flex align-items-center">
+                                                                                    <p className="text-black d-flex align-items-center">
                                                                                         <i
                                                                                             className="ph-duotone ph-star f-s-16 me-2 text-success"
                                                                                             data-bs-toggle="tooltip"
@@ -764,10 +756,10 @@ const TeamPage = () => {
                                                                 </div>
                                                             ) : weekStart ? (
                                                                 <div className="row mb-4">
-                                                                    <div className="col-12">
+                                                                    <div className="col-12 d-flex justify-content-center">
                                                                         <div className="best-user-card card shadow-sm">
                                                                             <div className="card-body">
-                                                                                <p className="text-muted">No best performer for {project.name} this week.</p>
+                                                                                <p className="text-black">No best performer for {project.name} this week.</p>
                                                                                 <p className="text-muted">
                                                                                     Week: {weekStart} to {weekEnd}
                                                                                 </p>
@@ -777,10 +769,10 @@ const TeamPage = () => {
                                                                 </div>
                                                             ) : (
                                                                 <div className="row mb-4">
-                                                                    <div className="col-12">
+                                                                    <div className="col-12 d-flex justify-content-center">
                                                                         <div className="best-user-card card shadow-sm">
                                                                             <div className="card-body">
-                                                                                <p className="text-muted">Loading best performer for {project.name}...</p>
+                                                                                <p className="text-black">Loading best performer for {project.name}...</p>
                                                                             </div>
                                                                         </div>
                                                                     </div>

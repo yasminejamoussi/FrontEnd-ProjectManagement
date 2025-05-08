@@ -9,10 +9,17 @@
   padding: 20px;
 }
 
+.title-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
 .main-title {
   font-size: 24px;
   font-weight: 600;
-  margin-bottom: 10px;
+  margin: 0;
 }
 
 .app-line-breadcrumbs {
@@ -23,7 +30,7 @@
 }
 
 .app-line-breadcrumbs li a {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
   color: #333;
   text-decoration: none;
@@ -140,30 +147,29 @@
   display: flex;
   justify-content: space-between;
   margin-bottom: 15px;
-  gap: 5px; /* Réduit l'espacement entre les sections */
+  gap: 5px;
 }
 
 .team-contentbox {
   flex: 1;
-  padding: 5px; /* Réduit le padding pour moins d'espacement interne */
+  padding: 5px;
 }
 
 .team-contentbox p {
   margin: 0;
-  font-size: 14px; /* Taille de police uniforme */
+  font-size: 14px;
 }
 
-/* Couleurs pastel pour chaque section */
-.team-contentbox.projects p.text-black-bold{
-  color: #388E3C; /* Vert pastel pour Projects */
+.team-contentbox.projects p.text-black-bold {
+  color: #388E3C;
 }
 
-.team-contentbox.tasks p.text-black-bold{
-  color: #0288D1; /* Bleu pastel pour Tasks */
+.team-contentbox.tasks p.text-black-bold {
+  color: #0288D1;
 }
 
-.team-contentbox.role p.text-black-bold{
-  color: #C2185B; /* Rose pastel pour Role */
+.team-contentbox.role p.text-black-bold {
+  color: #C2185B;
 }
 
 .text-black-bold {
@@ -197,7 +203,154 @@
 }
 
 .badge-image {
-  width: 36px; /* Ajuste la taille des badges pour correspondre à l'image */
-  height: 36px;
-  margin: 0 10px; /* Espacement entre les badges */
+  width: 30px;
+  height: 30px;
+  margin: 0 5px;
+}
+
+
+
+/* Hall of Fame Card */
+.hall-of-fame-card {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.5s ease-in-out, opacity 0.5s ease-in-out;
+  opacity: 0;
+  border: 1px solid #ffd700;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #fffbe6 0%, #f0f4f8 100%);
+  position: relative;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.hall-of-fame-card.open {
+  max-height: 1000px;
+  opacity: 1;
+  padding: 15px;
+}
+
+/* Hall of Fame Cards Container */
+.hof-cards-container {
+  display: flex;
+  gap: -5px; /* Superposition légère des cartes */
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* Best User Card (General - used in project tabs and Hall of Fame) */
+.best-user-card,
+.hall-of-fame-card .hof-best-user-card {
+  max-width: 500px;
+  width: 100%;
+  padding: 12px;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  margin: 0 auto 15px;
+  background: #fff;
+  border: 1px solid #ffd700;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.best-user-card:hover,
+.hall-of-fame-card .hof-best-user-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+}
+
+/* Best User Image (applies to both .best-user-card and .hof-best-user-card) */
+.best-user-image {
+  position: relative;
+}
+
+.profile-image {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  margin-right: 15px;
+  border: 2px solid #ffd700;
+  object-fit: cover;
+}
+
+/* Badges Styling */
+.best-user-image .badges {
+  position: absolute;
+  bottom: -8px;
+  right: -8px;
+  display: flex;
+  align-items: center;
+  flex-direction: row;
+}
+
+.best-performer-badge {
+  width: 30px;
+  height: 30px;
+  border: none;
+  transition: transform 0.3s;
+  margin-left: -6px;
+}
+
+.best-performer-badge:first-child {
+  margin-left: 0;
+}
+
+.best-performer-badge:hover {
+  transform: scale(1.2);
+}
+
+/* Text Styling */
+.best-user-card h5,
+.hall-of-fame-card .hof-best-user-card h5 {
+  font-size: 1.2rem;
+  margin-bottom: 0.4rem;
+  font-weight: bold;
+}
+
+.best-user-card p,
+.hall-of-fame-card .hof-best-user-card p {
+  margin-bottom: 0.3rem;
+  color: #333;
+}
+
+.best-user-card p.text-muted,
+.hall-of-fame-card .hof-best-user-card p.text-muted {
+  color: #777;
+  margin-bottom: 0;
+}
+
+/* Confetti Animation */
+.confetti {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: #ffd700;
+  animation: confetti-fall 2s linear;
+  top: -8px;
+  z-index: 1000;
+}
+
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(800px) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+/* Select Week Button Styling */
+.btn-outline-primary.btn-sm.rounded-pill {
+  padding: 6px 20px;
+  font-size: 14px;
+  background-color: #f8f9fa;
+  border-color: var(--primary);
+  color: var(--primary);
+  transition: all 0.3s;
+}
+
+.btn-outline-primary.btn-sm.rounded-pill:hover {
+  background-color: var(--primary);
+  color: var(--primary);
 }

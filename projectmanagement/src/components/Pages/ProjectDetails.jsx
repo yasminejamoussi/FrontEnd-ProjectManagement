@@ -34,10 +34,19 @@ const ProjectDetails = () => {
         setProject(projectResponse.data);
         setTeamMembers(projectResponse.data.teamMembers || []);
         console.log("teamMembers assigné :", projectResponse.data.teamMembers || []);
+
+        // Check if a Team Leader is already assigned
+        const hasTeamLeader = (projectResponse.data.teamMembers || []).some(member => member.role?.name === "Team Leader");
+
+        // Filter available members
         const available = usersResponse.data.filter(user => {
           const roleName = user.role?.name;
           const isValidRole = ["Team Leader", "Team Member"].includes(roleName);
           const isNotAssigned = !projectResponse.data.teamMembers.some(member => member._id === user._id);
+          // If a Team Leader is already assigned, exclude other Team Leaders
+          if (hasTeamLeader && roleName === "Team Leader") {
+            return false;
+          }
           return isValidRole && isNotAssigned;
         });
         console.log("Membres disponibles :", available);
@@ -55,12 +64,27 @@ const ProjectDetails = () => {
   console.log("État teamMembers rendu :", teamMembers);
 
   const removeTeamMember = async (memberId) => {
-    if (window.confirm(`Voulez-vous vraiment supprimer ce membre de l’équipe ?`)) {
+    if (window.confirm(`Are you sure you want to remove this team member ?`)) {
       try {
         const updatedTeam = teamMembers.filter(member => member._id !== memberId);
         await axios.put(`http://localhost:4000/api/projects/${id}`, { teamMembers: updatedTeam.map(m => m._id) });
+
+        // Update team members
         setTeamMembers(updatedTeam);
-        setAvailableMembers([...availableMembers, teamMembers.find(m => m._id === memberId)]);
+
+        // Recompute available members after removal
+        const memberRemoved = teamMembers.find(m => m._id === memberId);
+        const updatedAvailableMembers = [...availableMembers, memberRemoved];
+        const hasTeamLeader = updatedTeam.some(member => member.role?.name === "Team Leader");
+        const filteredAvailableMembers = updatedAvailableMembers.filter(user => {
+          const roleName = user.role?.name;
+          const isValidRole = ["Team Leader", "Team Member"].includes(roleName);
+          if (hasTeamLeader && roleName === "Team Leader") {
+            return false;
+          }
+          return isValidRole;
+        });
+        setAvailableMembers(filteredAvailableMembers);
       } catch (err) {
         setError(err.response?.data?.error || err.message);
       }
@@ -74,8 +98,24 @@ const ProjectDetails = () => {
         const memberToAdd = availableMembers.find(member => member._id === selectedMember);
         const updatedTeam = [...teamMembers, memberToAdd];
         await axios.put(`http://localhost:4000/api/projects/${id}`, { teamMembers: updatedTeam.map(m => m._id) });
+
+        // Update team members
         setTeamMembers(updatedTeam);
-        setAvailableMembers(availableMembers.filter(member => member._id !== selectedMember));
+
+        // Recompute available members after adding
+        const hasTeamLeader = updatedTeam.some(member => member.role?.name === "Team Leader");
+        const remainingAvailableMembers = availableMembers.filter(member => member._id !== selectedMember);
+        const filteredAvailableMembers = remainingAvailableMembers.filter(user => {
+          const roleName = user.role?.name;
+          const isValidRole = ["Team Leader", "Team Member"].includes(roleName);
+          if (hasTeamLeader && roleName === "Team Leader") {
+            return false;
+          }
+          return isValidRole;
+        });
+        setAvailableMembers(filteredAvailableMembers);
+
+        // Close modal and reset selection
         setShowAddMemberModal(false);
         setSelectedMember('');
       } catch (err) {
@@ -331,12 +371,13 @@ const ProjectDetails = () => {
                     left: 0,
                     width: '100%',
                     height: '100%',
-                    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                    zIndex: 1040,
+                    zIndex: 1100,
                   }}
                   onClick={() => setShowAddMemberModal(false)}
                 />
-                <div className="modal fade show" style={{ display: 'block', zIndex: 1050 }}>
+               
+               
+                <div className="modal fade show" style={{ display: 'block', zIndex: 1100 }}>
                   <div className="modal-dialog modal-dialog-centered">
                     <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '15px' }}>
                       <div className="modal-header bg-light border-bottom-0 py-3">

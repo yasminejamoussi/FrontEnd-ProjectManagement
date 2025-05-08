@@ -182,19 +182,35 @@ h1 {
   margin: 0;
   color: #555;
 }
-
 .export-options {
   margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* Centre horizontalement */
 }
 
-.export-options h3 {
-  color: #8575ec;
-  font-size: 18px;
-  margin-bottom: 10px;
+.checkbox-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px; /* Espacement entre les lignes */
+  width: 100%;
+  max-width: 400px; /* Limite la largeur pour un meilleur alignement */
 }
 
 .form-check {
-  margin-bottom: 10px;
+  margin-bottom: 0; /* Supprime la marge par défaut */
+  display: flex;
+  align-items: center;
+  gap: 10px; /* Espacement entre la case et le label */
+}
+
+.form-check-input {
+  margin: 0; /* Supprime les marges par défaut */
+}
+
+.form-check-label {
+  color: #333;
+  flex: 1; /* Permet au label de prendre l'espace restant */
 }
 
 .form-check-input:checked {
@@ -202,10 +218,7 @@ h1 {
   border-color: #8575ec;
 }
 
-.form-check-label {
-  color: #333;
-  margin-left: 5px;
-}
+
 
 .text-center {
   text-align: center;

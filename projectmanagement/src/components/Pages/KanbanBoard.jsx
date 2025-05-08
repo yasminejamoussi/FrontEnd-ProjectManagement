@@ -14,10 +14,13 @@ const KanbanBoard = () => {
   const { projectId } = useParams();
   const [tasks, setTasks] = useState([]);
   const [projectName, setProjectName] = useState('');
+  const [projectStartDate, setProjectStartDate] = useState('');
+  const [projectEndDate, setProjectEndDate] = useState('');
   const [users, setUsers] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [renderKey, setRenderKey] = useState(0);
   const [showForm, setShowForm] = useState(false);
   const [currentUserId, setCurrentUserId] = useState(null);
@@ -46,18 +49,18 @@ const KanbanBoard = () => {
       const { status, data } = error.response;
       switch (status) {
         case 403:
-          return "Accès interdit : Vous n'avez pas les permissions nécessaires pour effectuer cette action.";
+          return "Access denied: You do not have the necessary permissions to perform this action.";
         case 422:
-          return "Erreur de validation : Veuillez vérifier les données saisies et réessayer.";
+          return "Validation error: Please check the entered data and try again.";
         case 404:
-          return "Ressource non trouvée : Le projet ou la tâche demandée n'existe pas.";
+          return "Resource not found: The requested project or task does not exist.";
         case 500:
-          return "Erreur serveur : Une erreur s'est produite. Veuillez réessayer plus tard.";
+          return "Server error: An error occurred. Please try again later.";
         default:
-          return data.message || `Erreur ${status} : Une erreur inattendue s'est produite.`;
+          return data.message || `Error ${status}: An unexpected error occurred.`;
       }
     }
-    return error.message || "Erreur réseau : Vérifiez votre connexion et réessayez.";
+    return error.message || "Network error: Check your connection and try again.";
   };
 
   // Effacer les messages d'erreur après 5 secondes
@@ -103,6 +106,8 @@ const KanbanBoard = () => {
         }));
         setTasks(normalizedTasks);
         setProjectName(projectResponse.data.name || '');
+        setProjectStartDate(projectResponse.data.startDate ? new Date(projectResponse.data.startDate).toISOString().split('T')[0] : '');
+        setProjectEndDate(projectResponse.data.endDate ? new Date(projectResponse.data.endDate).toISOString().split('T')[0] : '');
         setUsers(usersResponse.data || []);
         const normalizedTeamMembers = (projectResponse.data.teamMembers || []).map(member => {
           if (typeof member === 'string') return member;
@@ -130,7 +135,7 @@ const KanbanBoard = () => {
         }
         const { columnGrids } = initializeKanbanBoard();
         gridsRef.current = columnGrids;
-  
+
         columnGrids.forEach((grid, index) => {
           grid.on('dragReleaseEnd', async (item) => {
             const taskId = item.getElement().dataset.taskId;
@@ -176,6 +181,8 @@ const KanbanBoard = () => {
     } else {
       setNewTask(prev => ({ ...prev, [name]: value }));
     }
+    // Effacer l'erreur pour ce champ lorsqu'il est modifié
+    setFieldErrors(prev => ({ ...prev, [name]: '' }));
   };
 
   const handleAssignedToChange = (e) => {
@@ -185,6 +192,7 @@ const KanbanBoard = () => {
     } else {
       setNewTask(prev => ({ ...prev, assignedTo: selected }));
     }
+    setFieldErrors(prev => ({ ...prev, assignedTo: '' }));
   };
 
   const suggestPriorityWithIA = async () => {
@@ -216,8 +224,8 @@ const KanbanBoard = () => {
     const task = editTask || newTask;
     console.log("Début de predictTaskDuration, task:", task);
     if (!task.title || !task.startDate) {
-      setError("Veuillez entrer un titre et une date de début avant de demander une prédiction.");
-      console.log("Erreur: titre ou startDate manquant");
+      setError("Please enter a title and start date before requesting a prediction.");
+      console.log("Error: title or startDate missing");
       return;
     }
     try {
@@ -278,6 +286,23 @@ const KanbanBoard = () => {
   };
 
   const handleCloseModal = () => {
+    setShowForm(false);
+    setEditTask(null);
+    setNewTask({
+      title: '',
+      description: '',
+      status: 'To Do',
+      priority: 'Medium',
+      assignedTo: [],
+      startDate: '',
+      dueDate: '',
+    });
+    setSuggestedDueDate(null);
+    setFieldErrors({});
+    setError(null);
+  };
+
+  const handleCloseProductivityModal = () => {
     setShowProductivityModal(false);
     setProductivityData([]);
   };
@@ -288,13 +313,26 @@ const KanbanBoard = () => {
       setError("User not authenticated. Please log in.");
       return;
     }
-    try {
-      const taskData = editTask || newTask;
-      if (taskData.dueDate && taskData.startDate && new Date(taskData.dueDate) < new Date(taskData.startDate)) {
-        setError("Due date cannot be earlier than start date.");
-        return;
-      }
+    const taskData = editTask || newTask;
+    const newFieldErrors = {};
 
+    // Validation des dates par rapport au projet (uniquement pour startDate)
+    if (taskData.startDate && projectStartDate && new Date(taskData.startDate) < new Date(projectStartDate)) {
+      newFieldErrors.startDate = `The start date cannot be earlier than the project's start date (${projectStartDate}).`;
+    }
+    if (taskData.dueDate && projectEndDate && new Date(taskData.dueDate) > new Date(projectEndDate)) {
+      newFieldErrors.dueDate = "The due date must be equal or earlier than the project end date.";
+    }
+    if (taskData.dueDate && taskData.startDate && new Date(taskData.dueDate) < new Date(taskData.startDate)) {
+      newFieldErrors.dueDate = "Due date cannot be earlier than start date.";
+    }
+
+    if (Object.keys(newFieldErrors).length > 0) {
+      setFieldErrors(newFieldErrors);
+      return;
+    }
+
+    try {
       if (editTask) {
         const response = await axios.put(`http://localhost:4000/api/tasks/${editTask._id}`, taskData);
         setTasks(prevTasks => prevTasks.map(task => task._id === editTask._id ? {
@@ -313,7 +351,8 @@ const KanbanBoard = () => {
         }]);
         setNewTask({ title: '', description: '', status: 'To Do', priority: 'Medium', assignedTo: [], startDate: '', dueDate: '' });
       }
-      setShowForm(false);
+      handleCloseModal();
+      setFieldErrors({});
       setRenderKey(prev => prev + 1);
     } catch (err) {
       setError(handleApiError(err));
@@ -400,9 +439,21 @@ const KanbanBoard = () => {
                   <li className="active"><a className="f-s-14 f-w-500" href="#">Projects</a></li>
                 </ul>
                 {teamMembers.length === 0 && (
-                  <div className="custom-alert custom-alert-danger mt-2">
-                    <i className="ph-duotone ph-warning-circle me-2"></i>
-                    No team members assigned to this project. Please assign members in the project settings.
+                  <div className="alert btn-primary" role="alert">
+                    <h4 className="alert-heading">
+                      <strong>Oops! Orchestra Incomplete!</strong>
+                    </h4>
+                    It seems this project lacks its musical ensemble! 🎶
+                    <br />
+                    Assemble your orchestra by assigning members in the{' '}
+                    <a
+                      href={`/project-details/${projectId}`}
+                      className="fw-bold"
+                      style={{ color: '#ffffff', textDecoration: 'none' }}
+                    >
+                      Project Settings
+                    </a>{' '}
+                    to unleash the symphony of task creation!
                   </div>
                 )}
                 {error && <div className="alert alert-danger">{error}</div>}
@@ -410,146 +461,152 @@ const KanbanBoard = () => {
             </div>
 
             {showForm && (
-              <div className="modal fade show" style={{ display: 'block' }}>
-                <div className="modal-dialog">
-                  <div className="modal-content">
-                    <div className="modal-header">
-                      <h5 className="modal-title">{editTask ? 'Edit Task' : 'Add Task'}</h5>
-                      <button type="button" className="btn-close" onClick={() => setShowForm(false)} />
-                    </div>
-                    <form onSubmit={handleSubmit}>
-                      <div className="modal-body">
-                        <div className="mb-3">
-                          <label className="form-label">Title</label>
-                          <input
-                            type="text"
-                            className="form-control"
-                            name="title"
-                            value={editTask ? editTask.title : newTask.title}
-                            onChange={handleInputChange}
-                            required
-                          />
-                        </div>
-                        <div className="mb-3">
-                          <label className="form-label">Description</label>
-                          <textarea
-                            className="form-control"
-                            name="description"
-                            value={editTask ? editTask.description : newTask.description}
-                            onChange={handleInputChange}
-                          />
-                        </div>
-                        <div className="mb-3">
-                          <label className="form-label">Status</label>
-                          <select
-                            className="form-control"
-                            name="status"
-                            value={editTask ? editTask.status : newTask.status}
-                            onChange={handleInputChange}
-                          >
-                            <option value="To Do">To Do</option>
-                            <option value="In Progress">In Progress</option>
-                            <option value="Review">Review</option>
-                            <option value="Done">Done</option>
-                            <option value="Tested">Tested</option>
-                          </select>
-                        </div>
-                        <div className="mb-3">
-                          <label className="form-label">Priority</label>
-                          <select
-                            className="form-control"
-                            name="priority"
-                            value={editTask ? editTask.priority : newTask.priority}
-                            onChange={handleInputChange}
-                          >
-                            <option value="Low">Low</option>
-                            <option value="Medium">Medium</option>
-                            <option value="High">High</option>
-                            <option value="Urgent">Urgent</option>
-                          </select>
-                        </div>
-                        <div className="mb-3">
-                          <button
-                            type="button"
-                            className="btn btn-info"
-                            onClick={suggestPriorityWithIA}
-                          >
-                            Suggest Priority with AI
-                          </button>
-                        </div>
-                        <div className="mb-3">
-                          <label className="form-label">Start Date</label>
-                          <input
-                            type="date"
-                            className="form-control"
-                            name="startDate"
-                            value={editTask ? editTask.startDate : newTask.startDate}
-                            onChange={handleInputChange}
-                          />
-                        </div>
-                        <div className="mb-3">
-                          <label className="form-label">Due Date</label>
-                          <input
-                            type="date"
-                            className="form-control"
-                            name="dueDate"
-                            value={editTask ? editTask.dueDate : newTask.dueDate}
-                            onChange={handleInputChange}
-                          />
-                          <button
-                            type="button"
-                            className="btn btn-info mt-2"
-                            onClick={predictTaskDuration}
-                          >
-                            Suggest a duration with AI
-                          </button>
-                        </div>
-                        {['Admin', 'Project Manager', 'Team Leader'].includes(userRole) && (
+              <>
+                <div className="modal fade show" style={{ display: 'block', zIndex: 1150 }}>
+                  <div className="modal-dialog">
+                    <div className="modal-content">
+                      <div className="modal-header">
+                        <h5 className="modal-title">{editTask ? 'Edit Task' : 'Add Task'}</h5>
+                        <button type="button" className="btn-close" onClick={handleCloseModal} />
+                      </div>
+                      <form onSubmit={handleSubmit}>
+                        <div className="modal-body">
                           <div className="mb-3">
-                            <label className="form-label">Assigned To</label>
+                            <label className="form-label">Title</label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              name="title"
+                              value={editTask ? editTask.title : newTask.title}
+                              onChange={handleInputChange}
+                              required
+                            />
+                          </div>
+                          <div className="mb-3">
+                            <label className="form-label">Description</label>
+                            <textarea
+                              className="form-control"
+                              name="description"
+                              value={editTask ? editTask.description : newTask.description}
+                              onChange={handleInputChange}
+                            />
+                          </div>
+                          <div className="mb-3">
+                            <label className="form-label">Status</label>
                             <select
                               className="form-control"
-                              name="assignedTo"
-                              multiple
-                              value={editTask ? (editTask.assignedTo || []) : newTask.assignedTo}
-                              onChange={handleAssignedToChange}
-                              style={{ height: '100px' }}
+                              name="status"
+                              value={editTask ? editTask.status : newTask.status}
+                              onChange={handleInputChange}
                             >
-                              {teamMembers.length > 0 ? (
-                                (() => {
-                                  const filteredUsers = users.filter(user => {
-                                    if (!user._id) return false;
-                                    const userId = user._id.toString();
-                                    return teamMembers.includes(userId);
-                                  });
-                                  if (filteredUsers.length === 0) {
-                                    return <option disabled>No matching team members found</option>;
-                                  }
-                                  return filteredUsers.map(user => (
-                                    <option key={user._id} value={user._id}>
-                                      {user.firstname} {user.lastname} ({user.role?.name || "Rôle non défini"})
-                                    </option>
-                                  ));
-                                })()
-                              ) : (
-                                <option disabled>No team members assigned to this project</option>
-                              )}
+                              <option value="To Do">To Do</option>
+                              <option value="In Progress">In Progress</option>
+                              <option value="Review">Review</option>
+                              <option value="Done">Done</option>
+                              <option value="Tested">Tested</option>
                             </select>
                           </div>
-                        )}
-                      </div>
-                      <div className="modal-footer">
-                        <button type="button" className="btn btn-secondary" onClick={() => setShowForm(false)}>
-                          Cancel
-                        </button>
-                        <button type="submit" className="btn btn-primary">
-                          {editTask ? 'Update' : 'Create'}
-                        </button>
-                      </div>
-                    </form>
+                          <div className="mb-3">
+                            <label className="form-label">Priority</label>
+                            <select
+                              className="form-control"
+                              name="priority"
+                              value={editTask ? editTask.priority : newTask.priority}
+                              onChange={handleInputChange}
+                            >
+                              <option value="Low">Low</option>
+                              <option value="Medium">Medium</option>
+                              <option value="High">High</option>
+                              <option value="Urgent">Urgent</option>
+                            </select>
+                          </div>
+                          <div className="mb-3">
+                            <button
+                              type="button"
+                              className="btn btn-info"
+                              onClick={suggestPriorityWithIA}
+                            >
+                              Suggest Priority with AI
+                            </button>
+                          </div>
+                          <div className="mb-3">
+                            <label className="form-label">Start Date</label>
+                            <input
+                              type="date"
+                              className="form-control"
+                              name="startDate"
+                              value={editTask ? editTask.startDate : newTask.startDate}
+                              onChange={handleInputChange}
+                              min={projectStartDate} // Restrict start date to project start date or later
+                            />
+                            {fieldErrors.startDate && <div className="text-danger">{fieldErrors.startDate}</div>}
+                          </div>
+                          <div className="mb-3">
+                            <label className="form-label">Due Date</label>
+                            <input
+                              type="date"
+                              className="form-control"
+                              name="dueDate"
+                              value={editTask ? editTask.dueDate : newTask.dueDate}
+                              onChange={handleInputChange}
+                            />
+                            {fieldErrors.dueDate && <div className="text-danger">{fieldErrors.dueDate}</div>}
+                            <button
+                              type="button"
+                              className="btn btn-info mt-2"
+                              onClick={predictTaskDuration}
+                            >
+                              Suggest a duration with AI
+                            </button>
+                          </div>
+                          {['Admin', 'Project Manager', 'Team Leader'].includes(userRole) && (
+                            <div className="mb-3">
+                              <label className="form-label">Assigned To</label>
+                              <select
+                                className="form-control"
+                                name="assignedTo"
+                                multiple
+                                value={editTask ? (editTask.assignedTo || []) : newTask.assignedTo}
+                                onChange={handleAssignedToChange}
+                                style={{ height: '100px' }}
+                              >
+                                {teamMembers.length > 0 ? (
+                                  (() => {
+                                    const teamMemberUsers = users.filter(user => {
+                                      if (!user._id) return false;
+                                      const userId = user._id.toString();
+                                      return teamMembers.includes(userId) && user.role?.name === 'Team Member';
+                                    });
+                                    if (teamMemberUsers.length === 0) {
+                                      return <option disabled>No team members found</option>;
+                                    }
+                                    return teamMemberUsers.map(user => (
+                                      <option key={user._id} value={user._id}>
+                                        {user.firstname} {user.lastname} ({user.role?.name || "Role not defined"})
+                                      </option>
+                                    ));
+                                  })()
+                                ) : (
+                                  <option disabled>No team members assigned to this project</option>
+                                )}
+                              </select>
+                            </div>
+                          )}
+                        </div>
+                        <div className="modal-footer">
+                          <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
+                            Cancel
+                          </button>
+                          <button type="submit" className="btn btn-primary">
+                            {editTask ? 'Update' : 'Create'}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
                   </div>
                 </div>
-              </div>
+                <div className="modal-backdrop fade show" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1100 }}></div>
+              </>
             )}
 
             <div className="row">
@@ -616,7 +673,7 @@ const KanbanBoard = () => {
 
             <Modal
               show={showProductivityModal}
-              onHide={handleCloseModal}
+              onHide={handleCloseProductivityModal}
               centered
               size="md"
               backdrop="static"
@@ -678,7 +735,7 @@ const KanbanBoard = () => {
                 {productivityError && <div className="alert alert-danger">Error: {productivityError}</div>}
               </Modal.Body>
               <Modal.Footer>
-                <Button variant="secondary" onClick={handleCloseModal}>
+                <Button variant="secondary" onClick={handleCloseProductivityModal}>
                   Close
                 </Button>
               </Modal.Footer>
