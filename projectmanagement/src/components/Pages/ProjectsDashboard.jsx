@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect, Suspense, lazy, Component } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { NavLink } from 'react-router-dom';
 import axios from 'axios';
@@ -8,8 +8,24 @@ import Sidebar from '../Layout/SideBar';
 import user from '../../assets/images/avtar/user.jpg';
 
 // Lazy load components for better performance
-const Modal = lazy(() => import('react-bootstrap/Modal'));
-const Button = lazy(() => import('react-bootstrap/Button'));
+const Modal = lazy(() => import('react-bootstrap').then(module => ({ default: module.Modal })));
+const Button = lazy(() => import('react-bootstrap').then(module => ({ default: module.Button })));
+
+// Error Boundary for lazy-loaded components
+class ErrorBoundary extends Component {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return <div className="alert alert-danger">Failed to load component. Please refresh the page.</div>;
+    }
+    return this.props.children;
+  }
+}
 
 // Configure Axios with base URL from environment variable
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL ;
@@ -722,327 +738,329 @@ const ProjectsDashboard = () => {
       </div>
 
       {showModal && (
-        <Suspense fallback={<div>Loading modal...</div>}>
-          <Modal show={showModal} onHide={() => setShowModal(false)} size="lg" centered>
-            <Modal.Header closeButton>
-              <Modal.Title>{editingProject ? 'Edit a project' : 'Add a new project'}</Modal.Title>
-            </Modal.Header>
-            <Modal.Body>
-              <form className="app-form" onSubmit={handleSubmit}>
-                <div className="mb-3">
-                  <label htmlFor="pName" className="form-label">
-                    Project name
-                  </label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    id="pName"
-                    defaultValue={editingProject?.name || ''}
-                    required
-                  />
-                </div>
-                <div className="mb-3">
-                  <label className="form-label">Start date</label>
-                  <input
-                    type="date"
-                    className="form-control"
-                    id="startDate"
-                    name="startDate"
-                    value={projectStartDate}
-                    onChange={handleDateChange}
-                    required
-                  />
-                </div>
-                <div className="mb-3">
-                  <label className="form-label">End date</label>
-                  <input
-                    type="date"
-                    className="form-control"
-                    id="endDate"
-                    name="endDate"
-                    value={projectEndDate}
-                    onChange={handleDateChange}
-                    required
-                  />
-                  {formErrors.endDate && <div className="text-danger mt-1">{formErrors.endDate}</div>}
-                  <div className="mb-3 text-center">
-                    <Button variant="primary" onClick={suggestEndDate} className="mt-2">
-                      Suggest a date
-                    </Button>
-                    {predictedDuration && (
-                      <p className="mt-2 text-muted">Estimated duration: {predictedDuration} Days</p>
-                    )}
-                  </div>
-                </div>
-                <div className="mb-3">
-                  <label htmlFor="projectDescription" className="form-label">
-                    Description
-                  </label>
-                  <textarea
-                    className="form-control"
-                    rows="5"
-                    id="projectDescription"
-                    defaultValue={editingProject?.description || ''}
-                  />
-                </div>
-                <div className="mb-3">
-                  <label htmlFor="deliverables" className="form-label">
-                    Deliverables
-                  </label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    id="deliverables"
-                    defaultValue={editingProject?.deliverables?.join(', ') || ''}
-                    placeholder="Separated by commas"
-                    onBlur={e => {
-                      if (e.target.value) {
-                        suggestUsersBasedOnDeliverables(e.target.value);
-                      } else {
-                        setSuggestedUsers([]);
-                        setFormErrors(prev => ({ ...prev, deliverables: '' }));
-                      }
-                    }}
-                  />
-                  {formErrors.deliverables && <div className="text-danger mt-1">{formErrors.deliverables}</div>}
-                </div>
-                {isSuggestingUsers && (
+        <ErrorBoundary>
+          <Suspense fallback={<div>Loading modal...</div>}>
+            <Modal show={showModal} onHide={() => setShowModal(false)} size="lg" centered>
+              <Modal.Header closeButton>
+                <Modal.Title>{editingProject ? 'Edit a project' : 'Add a new project'}</Modal.Title>
+              </Modal.Header>
+              <Modal.Body>
+                <form className="app-form" onSubmit={handleSubmit}>
                   <div className="mb-3">
-                    <p className="text-muted">Loading suggestions...</p>
+                    <label htmlFor="pName" className="form-label">
+                      Project name
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="pName"
+                      defaultValue={editingProject?.name || ''}
+                      required
+                    />
                   </div>
-                )}
-                {suggestedUsers.length > 0 && (
                   <div className="mb-3">
-                    <h5>Suggested Users</h5>
-                    <ul className="list-group">
-                      {suggestedUsers.map(user => (
-                        <li key={user.id} className="list-group-item">
-                          <div className="d-flex justify-content-between align-items-center">
-                            <div>
-                              <strong>
-                                {user.firstname} {user.lastname}
-                              </strong>{' '}
-                              ({user.role})<br />
-                              <small>Skills: {Array.isArray(user.skills) ? user.skills.join(', ') : 'None'}</small>
-                              <br />
-                              <small>Corresponding skills: {Array.isArray(user.commonSkills) ? user.commonSkills.join(', ') : 'None'}</small>
-                              <br />
-                              <small>Assigned tasks: {user.taskCount}</small>
-                            </div>
-                            <div>
-                              <span className="badge bg-success">Score: {user.score}%</span>
-                            </div>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
+                    <label className="form-label">Start date</label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      id="startDate"
+                      name="startDate"
+                      value={projectStartDate}
+                      onChange={handleDateChange}
+                      required
+                    />
                   </div>
-                )}
-                <div className="mb-3">
-                  <label htmlFor="team" className="form-label">
-                    Team project
-                  </label>
-                  <select
-                    className="form-control"
-                    id="team"
-                    multiple
-                    defaultValue={editingProject?.teamMembers?.map(member => member._id || member) || []}
-                    style={{ height: '150px' }}
-                    onChange={handleTeamSelectionChange}
-                  >
-                    {Array.isArray(users) && users
-                      .filter(user => user.role?.name && ['Team Leader', 'Team Member'].includes(user.role.name))
-                      .sort((a, b) => {
-                        const aProjects = Array.isArray(a.managedProjects) ? a.managedProjects.length : 0;
-                        const bProjects = Array.isArray(b.managedProjects) ? b.managedProjects.length : 0;
-                        return aProjects - bProjects;
-                      })
-                      .map(user => (
-                        <option key={user._id} value={user._id}>
-                          {user.firstname} {user.lastname} ({user.role?.name || 'Role not defined'}) - Projects:{' '}
-                          {Array.isArray(user.managedProjects) ? user.managedProjects.length : 0}
-                        </option>
-                      ))}
-                  </select>
-                  {formErrors.team && <div className="text-danger mt-1">{formErrors.team}</div>}
-                </div>
-                <div className="mb-3">
-                  <label htmlFor="objectives" className="form-label">
-                    Objectives
-                  </label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    id="objectives"
-                    defaultValue={editingProject?.objectives?.join(', ') || ''}
-                    placeholder="Separated by commas"
-                  />
-                </div>
-                <div className="mb-3">
-                  <h5>Add tasks</h5>
-                  <div className="row">
-                    <div className="col-md-4">
-                      <label className="form-label">Title</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        value={newTask.title}
-                        name="title"
-                        onChange={handleTaskInputChange}
-                      />
-                      {formErrors.taskTitle && <div className="text-danger mt-1">{formErrors.taskTitle}</div>}
-                    </div>
-                    <div className="col-md-4">
-                      <label className="form-label">Status</label>
-                      <select
-                        className="form-control"
-                        value={newTask.status}
-                        onChange={e => setNewTask({ ...newTask, status: e.target.value })}
-                      >
-                        <option value="To Do">To Do</option>
-                        <option value="In Progress">In Progress</option>
-                        <option value="Review">Review</option>
-                        <option value="Done">Done</option>
-                        <option value="Tested">Tested</option>
-                      </select>
-                    </div>
-                    <div className="col-md-4">
-                      <label className="form-label">Priority</label>
-                      <select
-                        className="form-control"
-                        value={newTask.priority}
-                        onChange={e => setNewTask({ ...newTask, priority: e.target.value })}
-                      >
-                        <option value="Low">Low</option>
-                        <option value="Medium">Medium</option>
-                        <option value="High">High</option>
-                        <option value="Urgent">Urgent</option>
-                      </select>
-                      {formErrors.taskPriority && <div className="text-danger mt-1">{formErrors.taskPriority}</div>}
+                  <div className="mb-3">
+                    <label className="form-label">End date</label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      id="endDate"
+                      name="endDate"
+                      value={projectEndDate}
+                      onChange={handleDateChange}
+                      required
+                    />
+                    {formErrors.endDate && <div className="text-danger mt-1">{formErrors.endDate}</div>}
+                    <div className="mb-3 text-center">
+                      <Button variant="primary" onClick={suggestEndDate} className="mt-2">
+                        Suggest a date
+                      </Button>
+                      {predictedDuration && (
+                        <p className="mt-2 text-muted">Estimated duration: {predictedDuration} Days</p>
+                      )}
                     </div>
                   </div>
-                  <div className="row mt-2">
-                    <div className="col-md-4">
-                      <label className="form-label">Start date</label>
-                      <input
-                        type="date"
-                        className="form-control"
-                        value={newTask.startDate}
-                        onChange={handleTaskInputChange}
-                        name="startDate"
-                        min={projectStartDate}
-                      />
-                      {fieldErrors.startDate && <div className="text-danger mt-1">{fieldErrors.startDate}</div>}
-                    </div>
-                    <div className="col-md-4">
-                      <label className="form-label">Deadline</label>
-                      <input
-                        type="date"
-                        className="form-control"
-                        value={newTask.dueDate}
-                        onChange={handleTaskInputChange}
-                        name="dueDate"
-                      />
-                      {fieldErrors.dueDate && <div className="text-danger mt-1">{fieldErrors.dueDate}</div>}
-                    </div>
-                    <div className="col-md-4">
-                      <label className="form-label">Assigned to</label>
-                      <select
-                        className="form-control"
-                        multiple
-                        value={newTask.assignedTo}
-                        onChange={e =>
-                          setNewTask({
-                            ...newTask,
-                            assignedTo: Array.from(e.target.selectedOptions).map(opt => opt.value),
-                          })
+                  <div className="mb-3">
+                    <label htmlFor="projectDescription" className="form-label">
+                      Description
+                    </label>
+                    <textarea
+                      className="form-control"
+                      rows="5"
+                      id="projectDescription"
+                      defaultValue={editingProject?.description || ''}
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label htmlFor="deliverables" className="form-label">
+                      Deliverables
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="deliverables"
+                      defaultValue={editingProject?.deliverables?.join(', ') || ''}
+                      placeholder="Separated by commas"
+                      onBlur={e => {
+                        if (e.target.value) {
+                          suggestUsersBasedOnDeliverables(e.target.value);
+                        } else {
+                          setSuggestedUsers([]);
+                          setFormErrors(prev => ({ ...prev, deliverables: '' }));
                         }
-                        style={{ height: '100px' }}
-                      >
-                        {selectedTeamMembers.length > 0 && Array.isArray(users) ? (
-                          users
-                            .filter(user => selectedTeamMembers.includes(user._id) && user.role?.name === 'Team Member')
-                            .map(user => (
-                              <option key={user._id} value={user._id}>
-                                {user.firstname} {user.lastname} ({user.role?.name || 'Role not defined'})
-                              </option>
-                            ))
-                        ) : (
-                          <option disabled>No team members selected</option>
-                        )}
-                      </select>
+                      }}
+                    />
+                    {formErrors.deliverables && <div className="text-danger mt-1">{formErrors.deliverables}</div>}
+                  </div>
+                  {isSuggestingUsers && (
+                    <div className="mb-3">
+                      <p className="text-muted">Loading suggestions...</p>
                     </div>
-                  </div>
-                  <div className="row mt-2">
-                    <div className="col-md-12">
-                      <label className="form-label">Description</label>
-                      <textarea
-                        className="form-control"
-                        value={newTask.description}
-                        onChange={e => setNewTask({ ...newTask, description: e.target.value })}
-                      />
+                  )}
+                  {suggestedUsers.length > 0 && (
+                    <div className="mb-3">
+                      <h5>Suggested Users</h5>
+                      <ul className="list-group">
+                        {suggestedUsers.map(user => (
+                          <li key={user.id} className="list-group-item">
+                            <div className="d-flex justify-content-between align-items-center">
+                              <div>
+                                <strong>
+                                  {user.firstname} {user.lastname}
+                                </strong>{' '}
+                                ({user.role})<br />
+                                <small>Skills: {Array.isArray(user.skills) ? user.skills.join(', ') : 'None'}</small>
+                                <br />
+                                <small>Corresponding skills: {Array.isArray(user.commonSkills) ? user.commonSkills.join(', ') : 'None'}</small>
+                                <br />
+                                <small>Assigned tasks: {user.taskCount}</small>
+                              </div>
+                              <div>
+                                <span className="badge bg-success">Score: {user.score}%</span>
+                              </div>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
-                  </div>
-                  <div className="mt-2">
-                    <Button
-                      variant="info"
-                      className="me-2"
-                      onClick={suggestPriorityWithIA}
-                      disabled={isSuggestingPriority}
-                    >
-                      {isSuggestingPriority ? 'Suggesting...' : 'Suggest Priority with AI'}
-                    </Button>
-                    <Button variant="outline-primary" onClick={addTaskToList}>
-                      Add task
-                    </Button>
-                  </div>
-                </div>
-                {taskList.length > 0 && (
+                  )}
                   <div className="mb-3">
-                    <h5>Added tasks</h5>
-                    <ul className="list-group">
-                      {taskList.map((task, index) => (
-                        <li key={index} className="list-group-item d-flex justify-content-between align-items-center">
-                          <span>
-                            {task.title} ({task.status}, {task.priority})
-                            {task.startDate && ` - Start: ${formatDate(task.startDate)}`}
-                            {task.dueDate && ` - Deadline: ${formatDate(task.dueDate)}`}
-                            {task.assignedTo.length > 0 &&
-                              ` - Assigned to: ${task.assignedTo
-                                .map(userId => {
-                                  const user = Array.isArray(users) ? users.find(u => u._id === userId) : null;
-                                  return user ? `${user.firstname} ${user.lastname}` : 'Unknown';
-                                })
-                                .join(', ')}`}
-                          </span>
-                          <Button variant="danger" size="sm" onClick={() => removeTaskFromList(index)}>
-                            Delete
-                          </Button>
-                        </li>
-                      ))}
-                    </ul>
+                    <label htmlFor="team" className="form-label">
+                      Team project
+                    </label>
+                    <select
+                      className="form-control"
+                      id="team"
+                      multiple
+                      defaultValue={editingProject?.teamMembers?.map(member => member._id || member) || []}
+                      style={{ height: '150px' }}
+                      onChange={handleTeamSelectionChange}
+                    >
+                      {Array.isArray(users) && users
+                        .filter(user => user.role?.name && ['Team Leader', 'Team Member'].includes(user.role.name))
+                        .sort((a, b) => {
+                          const aProjects = Array.isArray(a.managedProjects) ? a.managedProjects.length : 0;
+                          const bProjects = Array.isArray(b.managedProjects) ? b.managedProjects.length : 0;
+                          return aProjects - bProjects;
+                        })
+                        .map(user => (
+                          <option key={user._id} value={user._id}>
+                            {user.firstname} {user.lastname} ({user.role?.name || 'Role not defined'}) - Projects:{' '}
+                            {Array.isArray(user.managedProjects) ? user.managedProjects.length : 0}
+                          </option>
+                        ))}
+                    </select>
+                    {formErrors.team && <div className="text-danger mt-1">{formErrors.team}</div>}
                   </div>
-                )}
-                {formErrors.general && <div className="alert alert-danger">{formErrors.general}</div>}
-                {success && <div className="alert alert-success">{success}</div>}
-                <Modal.Footer>
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      setShowModal(false);
-                      resetModalState();
-                    }}
-                  >
-                    Close
-                  </Button>
-                  <Button variant="primary" type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? 'Loading...' : editingProject ? 'Edit' : 'Add'}
-                  </Button>
-                </Modal.Footer>
-              </form>
-            </Modal.Body>
-          </Modal>
-        </Suspense>
+                  <div className="mb-3">
+                    <label htmlFor="objectives" className="form-label">
+                      Objectives
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="objectives"
+                      defaultValue={editingProject?.objectives?.join(', ') || ''}
+                      placeholder="Separated by commas"
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <h5>Add tasks</h5>
+                    <div className="row">
+                      <div className="col-md-4">
+                        <label className="form-label">Title</label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          value={newTask.title}
+                          name="title"
+                          onChange={handleTaskInputChange}
+                        />
+                        {formErrors.taskTitle && <div className="text-danger mt-1">{formErrors.taskTitle}</div>}
+                      </div>
+                      <div className="col-md-4">
+                        <label className="form-label">Status</label>
+                        <select
+                          className="form-control"
+                          value={newTask.status}
+                          onChange={e => setNewTask({ ...newTask, status: e.target.value })}
+                        >
+                          <option value="To Do">To Do</option>
+                          <option value="In Progress">In Progress</option>
+                          <option value="Review">Review</option>
+                          <option value="Done">Done</option>
+                          <option value="Tested">Tested</option>
+                        </select>
+                      </div>
+                      <div className="col-md-4">
+                        <label className="form-label">Priority</label>
+                        <select
+                          className="form-control"
+                          value={newTask.priority}
+                          onChange={e => setNewTask({ ...newTask, priority: e.target.value })}
+                        >
+                          <option value="Low">Low</option>
+                          <option value="Medium">Medium</option>
+                          <option value="High">High</option>
+                          <option value="Urgent">Urgent</option>
+                        </select>
+                        {formErrors.taskPriority && <div className="text-danger mt-1">{formErrors.taskPriority}</div>}
+                      </div>
+                    </div>
+                    <div className="row mt-2">
+                      <div className="col-md-4">
+                        <label className="form-label">Start date</label>
+                        <input
+                          type="date"
+                          className="form-control"
+                          value={newTask.startDate}
+                          onChange={handleTaskInputChange}
+                          name="startDate"
+                          min={projectStartDate}
+                        />
+                        {fieldErrors.startDate && <div className="text-danger mt-1">{fieldErrors.startDate}</div>}
+                      </div>
+                      <div className="col-md-4">
+                        <label className="form-label">Deadline</label>
+                        <input
+                          type="date"
+                          className="form-control"
+                          value={newTask.dueDate}
+                          onChange={handleTaskInputChange}
+                          name="dueDate"
+                        />
+                        {fieldErrors.dueDate && <div className="text-danger mt-1">{fieldErrors.dueDate}</div>}
+                      </div>
+                      <div className="col-md-4">
+                        <label className="form-label">Assigned to</label>
+                        <select
+                          className="form-control"
+                          multiple
+                          value={newTask.assignedTo}
+                          onChange={e =>
+                            setNewTask({
+                              ...newTask,
+                              assignedTo: Array.from(e.target.selectedOptions).map(opt => opt.value),
+                            })
+                          }
+                          style={{ height: '100px' }}
+                        >
+                          {selectedTeamMembers.length > 0 && Array.isArray(users) ? (
+                            users
+                              .filter(user => selectedTeamMembers.includes(user._id) && user.role?.name === 'Team Member')
+                              .map(user => (
+                                <option key={user._id} value={user._id}>
+                                  {user.firstname} {user.lastname} ({user.role?.name || 'Role not defined'})
+                                </option>
+                              ))
+                          ) : (
+                            <option disabled>No team members selected</option>
+                          )}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="row mt-2">
+                      <div className="col-md-12">
+                        <label className="form-label">Description</label>
+                        <textarea
+                          className="form-control"
+                          value={newTask.description}
+                          onChange={e => setNewTask({ ...newTask, description: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <div className="mt-2">
+                      <Button
+                        variant="info"
+                        className="me-2"
+                        onClick={suggestPriorityWithIA}
+                        disabled={isSuggestingPriority}
+                      >
+                        {isSuggestingPriority ? 'Suggesting...' : 'Suggest Priority with AI'}
+                      </Button>
+                      <Button variant="outline-primary" onClick={addTaskToList}>
+                        Add task
+                      </Button>
+                    </div>
+                  </div>
+                  {taskList.length > 0 && (
+                    <div className="mb-3">
+                      <h5>Added tasks</h5>
+                      <ul className="list-group">
+                        {taskList.map((task, index) => (
+                          <li key={index} className="list-group-item d-flex justify-content-between align-items-center">
+                            <span>
+                              {task.title} ({task.status}, {task.priority})
+                              {task.startDate && ` - Start: ${formatDate(task.startDate)}`}
+                              {task.dueDate && ` - Deadline: ${formatDate(task.dueDate)}`}
+                              {task.assignedTo.length > 0 &&
+                                ` - Assigned to: ${task.assignedTo
+                                  .map(userId => {
+                                    const user = Array.isArray(users) ? users.find(u => u._id === userId) : null;
+                                    return user ? `${user.firstname} ${user.lastname}` : 'Unknown';
+                                  })
+                                  .join(', ')}`}
+                            </span>
+                            <Button variant="danger" size="sm" onClick={() => removeTaskFromList(index)}>
+                              Delete
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {formErrors.general && <div className="alert alert-danger">{formErrors.general}</div>}
+                  {success && <div className="alert alert-success">{success}</div>}
+                  <Modal.Footer>
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        setShowModal(false);
+                        resetModalState();
+                      }}
+                    >
+                      Close
+                    </Button>
+                    <Button variant="primary" type="submit" disabled={isSubmitting}>
+                      {isSubmitting ? 'Loading...' : editingProject ? 'Edit' : 'Add'}
+                    </Button>
+                  </Modal.Footer>
+                </form>
+              </Modal.Body>
+            </Modal>
+          </Suspense>
+        </ErrorBoundary>
       )}
     </div>
   );
