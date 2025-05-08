@@ -4,22 +4,24 @@ import { Modal, Button } from 'react-bootstrap';
 import { FaTrash, FaEdit, FaSearch } from 'react-icons/fa';
 import Header from '../Layout/Header';
 import Sidebar from '../Layout/SideBar';
-import { useNavigate } from 'react-router-dom';
 
 const UserList = () => {
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [entries, setEntries] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
-  const [showEditModal, setShowEditModal] = useState(false);
   const [roleFilter, setRoleFilter] = useState('All');
   const [error, setError] = useState(null);
-  const navigate = useNavigate();
+  const [formErrors, setFormErrors] = useState({});
   const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:4000';
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const phoneRegex = /^[+]?[\d\s-]{8,15}$/;
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -96,6 +98,60 @@ const UserList = () => {
     setShowDeleteModal(false);
   };
 
+  const handleEditClick = (user) => {
+    setSelectedUser({ ...user, role: user.role?.name || '' });
+    setFormErrors({});
+    setShowEditModal(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
+    setSelectedUser(null);
+    setFormErrors({});
+  };
+
+  const validateForm = () => {
+    const errors = {};
+
+    if (!selectedUser.firstname?.trim()) errors.firstname = 'Le prénom est requis.';
+    if (!selectedUser.lastname?.trim()) errors.lastname = 'Le nom est requis.';
+    if (!selectedUser.phone?.trim()) errors.phone = 'Le numéro de téléphone est requis.';
+    else if (!phoneRegex.test(selectedUser.phone)) errors.phone = 'Le numéro de téléphone est invalide.';
+    if (!selectedUser.email?.trim()) errors.email = 'L\'email est requis.';
+    else if (!emailRegex.test(selectedUser.email)) errors.email = 'L\'email est invalide.';
+    if (!selectedUser.role) errors.role = 'Le rôle est requis.';
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setSelectedUser((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSaveUser = async () => {
+    if (!validateForm()) return;
+
+    const token = localStorage.getItem('token');
+    try {
+      const response = await axios.put(
+        `${apiBaseUrl}/api/auth/users/${selectedUser._id}`,
+        selectedUser,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setUsers(users.map((user) => (user._id === selectedUser._id ? response.data : user)));
+      setFilteredUsers(filteredUsers.map((user) => (user._id === selectedUser._id ? response.data : user)));
+      setShowEditModal(false);
+      alert('Utilisateur mis à jour avec succès !');
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour de l\'utilisateur:', error);
+      alert(error.response?.data?.message || 'Erreur lors de la mise à jour.');
+    }
+  };
+
   const handlePageChange = (newPage) => {
     const totalPages = Math.ceil(filteredUsers.length / entries);
     if (newPage >= 1 && newPage <= totalPages) {
@@ -118,43 +174,6 @@ const UserList = () => {
         return { class: 'bg-primary', color: '#fff' };
       default:
         return { class: 'bg-secondary', color: '#000' };
-    }
-  };
-
-  const handleEditClick = (user) => {
-    setSelectedUser({ ...user, role: user.role?.name || '' });
-    setShowEditModal(true);
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setSelectedUser((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSaveUser = async () => {
-    const token = localStorage.getItem('token');
-    try {
-      const response = await axios.put(
-        `${apiBaseUrl}/api/auth/users/${selectedUser._id}`,
-        selectedUser,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      setUsers(users.map((user) => (user._id === selectedUser._id ? response.data : user)));
-      setFilteredUsers(filteredUsers.map((user) => (user._id === selectedUser._id ? response.data : user)));
-      setShowEditModal(false);
-    } catch (error) {
-      console.error('Erreur lors de la mise à jour de l\'utilisateur:', error);
-      alert(error.response?.data?.message || 'Erreur lors de la mise à jour.');
-    }
-  };
-
-  const handleNavigateToUpdate = (userId) => {
-    if (userId) {
-      navigate(`/users/${userId}`);
-    } else {
-      console.error('ID utilisateur non défini pour la navigation:', userId);
     }
   };
 
@@ -289,7 +308,7 @@ const UserList = () => {
                                   <button
                                     type="button"
                                     className="btn btn-success btn-sm"
-                                    onClick={() => handleNavigateToUpdate(user._id)}
+                                    onClick={() => handleEditClick(user)}
                                   >
                                     <FaEdit />
                                   </button>
@@ -348,58 +367,102 @@ const UserList = () => {
         </main>
       </div>
 
-      <Modal show={showEditModal} onHide={() => setShowEditModal(false)}>
+      <Modal show={showEditModal} onHide={handleCloseEditModal} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Mettre à jour l'utilisateur</Modal.Title>
+        </Modal.Header>
         <Modal.Body>
-          <h4>Update User</h4>
-          <input
-            type="text"
-            className="form-control mb-2"
-            name="firstname"
-            value={selectedUser?.firstname || ''}
-            onChange={handleInputChange}
-            placeholder="Prénom"
-          />
-          <input
-            type="text"
-            className="form-control mb-2"
-            name="lastname"
-            value={selectedUser?.lastname || ''}
-            onChange={handleInputChange}
-            placeholder="Nom"
-          />
-          <input
-            type="text"
-            className="form-control mb-2"
-            name="phone"
-            value={selectedUser?.phone || ''}
-            onChange={handleInputChange}
-            placeholder="Téléphone"
-          />
-          <input
-            type="email"
-            className="form-control mb-2"
-            name="email"
-            value={selectedUser?.email || ''}
-            onChange={handleInputChange}
-            placeholder="Email"
-          />
-          <select
-            className="form-control mb-2"
-            name="role"
-            value={selectedUser?.role || ''}
-            onChange={handleInputChange}
-          >
-            <option value="">Sélectionner un rôle</option>
-            {roles.map((role) => (
-              <option key={role._id} value={role.name}>
-                {role.name}
-              </option>
-            ))}
-          </select>
-          <Button variant="primary" onClick={handleSaveUser} className="mt-3">
-            Save
-          </Button>
+          <form>
+            <div className="mb-3">
+              <label htmlFor="editFirstname" className="form-label">Prénom</label>
+              <input
+                type="text"
+                className="form-control"
+                id="editFirstname"
+                name="firstname"
+                value={selectedUser?.firstname || ''}
+                onChange={handleInputChange}
+                placeholder="Prénom"
+              />
+              {formErrors.firstname && (
+                <small className="text-danger">{formErrors.firstname}</small>
+              )}
+            </div>
+            <div className="mb-3">
+              <label htmlFor="editLastname" className="form-label">Nom</label>
+              <input
+                type="text"
+                className="form-control"
+                id="editLastname"
+                name="lastname"
+                value={selectedUser?.lastname || ''}
+                onChange={handleInputChange}
+                placeholder="Nom"
+              />
+              {formErrors.lastname && (
+                <small className="text-danger">{formErrors.lastname}</small>
+              )}
+            </div>
+            <div className="mb-3">
+              <label htmlFor="editPhone" className="form-label">Téléphone</label>
+              <input
+                type="text"
+                className="form-control"
+                id="editPhone"
+                name="phone"
+                value={selectedUser?.phone || ''}
+                onChange={handleInputChange}
+                placeholder="Téléphone"
+              />
+              {formErrors.phone && (
+                <small className="text-danger">{formErrors.phone}</small>
+              )}
+            </div>
+            <div className="mb-3">
+              <label htmlFor="editEmail" className="form-label">Email</label>
+              <input
+                type="email"
+                className="form-control"
+                id="editEmail"
+                name="email"
+                value={selectedUser?.email || ''}
+                onChange={handleInputChange}
+                placeholder="Email"
+              />
+              {formErrors.email && (
+                <small className="text-danger">{formErrors.email}</small>
+              )}
+            </div>
+            <div className="mb-3">
+              <label htmlFor="editRole" className="form-label">Rôle</label>
+              <select
+                className="form-control"
+                id="editRole"
+                name="role"
+                value={selectedUser?.role || ''}
+                onChange={handleInputChange}
+              >
+                <option value="">Sélectionner un rôle</option>
+                {roles.map((role) => (
+                  <option key={role._id} value={role.name}>
+                    {role.name}
+                  </option>
+                ))}
+              </select>
+              {formErrors.role && (
+                <small className="text-danger">{formErrors.role}</small>
+              )}
+            </div>
+          </form>
         </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={handleCloseEditModal}>
+            Annuler
+          </Button>
+          <Button variant="primary" onClick={handleSaveUser}>
+            Enregistrer
+          </Button>
+        </Modal.Footer>
       </Modal>
 
       <Modal show={showDeleteModal} onHide={handleCloseDeleteModal} centered>
