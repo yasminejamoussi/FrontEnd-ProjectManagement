@@ -21,18 +21,18 @@ const TwoFactorAuth = () => {
         if (!token) {
           throw new Error("Token manquant !");
         }
-        
 
-       
         const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL;
-        const response = await fetch(`${apiBaseUrl}/api/auth/generate-2fa`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ email }),
-        });
+        const response = await axios.post(
+          `${apiBaseUrl}/api/auth/generate-2fa`,
+          { email },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
 
         console.log("📌 Réponse API QR Code:", response.data);
 
@@ -64,17 +64,19 @@ const TwoFactorAuth = () => {
         throw new Error("Token manquant !");
       }
 
-      // Activer le 2FA
-   
       const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL;
-      const enableResponse = await fetch(`${apiBaseUrl}/api/auth/enable-2fa`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ email, token: verificationCode }),
-      });
+
+      // Activer le 2FA
+      const enableResponse = await axios.post(
+        `${apiBaseUrl}/api/auth/enable-2fa`,
+        { email, token: verificationCode },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       console.log("📌 Réponse API Enable 2FA:", enableResponse.data);
 
@@ -82,15 +84,16 @@ const TwoFactorAuth = () => {
         throw new Error("Échec de l'activation du 2FA");
       }
 
-      // Vérifier le 2FA et récupérer le token
-      const verifyResponse = await fetch(`${apiBaseUrl}/api/auth/verify-2fa`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ email, token: verificationCode }),
-      });
+      // Vérifier le 2FA
+      const verifyResponse = await axios.post(
+        `${apiBaseUrl}/api/auth/verify-2fa`,
+        { email, token: verificationCode },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
       console.log("📌 Réponse API Vérification 2FA:", verifyResponse.data);
 
@@ -100,12 +103,13 @@ const TwoFactorAuth = () => {
 
       alert("✅ 2FA successfully verified !");
       localStorage.setItem("token", verifyResponse.data.token);
-      localStorage.removeItem("qrCode"); // Nettoyer le QR code
-      localStorage.removeItem("email"); // Nettoyer l'email
+      localStorage.setItem("user", JSON.stringify(verifyResponse.data.user));
+      localStorage.setItem("role", verifyResponse.data.user?.role?.name || "Guest");
+      localStorage.removeItem("email");
       navigate("/dashboard");
     } catch (error) {
       console.error("❌ Erreur lors de la vérification 2FA :", error);
-      setError(error.message);
+      setError(error.response?.data?.message || error.message);
     }
   };
 

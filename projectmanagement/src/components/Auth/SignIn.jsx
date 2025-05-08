@@ -43,7 +43,6 @@ const SignIn = () => {
 
     try {
       console.log("Sending login request with:", { email, password });
-      //const response = await axios.post("http://localhost:4000/api/auth/login", { email, password });
       const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL;
       const response = await axios.post(`${apiBaseUrl}/api/auth/login`, { email, password });
       console.log("API response:", response.data);
@@ -54,6 +53,10 @@ const SignIn = () => {
         const roleName = user?.role?.name || "Guest";
         console.log("Parsed role name (2FA):", roleName);
 
+        // Stocker le token pour 2FA
+        localStorage.setItem("token", response.data.token);
+        localStorage.setItem("email", email);
+
         if (roleName === "Guest") {
           console.log("Guest user detected, showing modal before 2FA");
           setShowGuestModal(true);
@@ -63,7 +66,6 @@ const SignIn = () => {
         }
 
         console.log("Non-guest user, redirecting to 2FA");
-        localStorage.setItem("email", email);
         navigate("/verify-2fa", { state: { email } });
         setLoading(false);
         return;
@@ -111,9 +113,8 @@ const SignIn = () => {
     try {
       setLoading(true);
       console.log("FaceID login attempt with label:", label);
-      //const response = await axios.post("http://localhost:4000/api/auth/login-with-face", { label });
       const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL;
-      const response = await axios.post(`${apiBaseUrl}/api/auth/login-with-face`, { label });
+      const response = await axios.post(`${apiBaseUrl}/api/auth/login-with-face`, { faceLabel: label });
       console.log("FaceID API response:", response.data);
 
       if (response.data.message === "2FA required") {
@@ -121,6 +122,10 @@ const SignIn = () => {
         console.log("Received user object (FaceID, 2FA):", user);
         const roleName = user?.role?.name || "Guest";
         console.log("Parsed role name (FaceID, 2FA):", roleName);
+
+        // Stocker le token pour 2FA
+        localStorage.setItem("token", response.data.token);
+        localStorage.setItem("email", user.email);
 
         if (roleName === "Guest") {
           console.log("Guest user detected (FaceID), showing modal before 2FA");
@@ -131,8 +136,7 @@ const SignIn = () => {
         }
 
         console.log("Non-guest user (FaceID), redirecting to 2FA");
-        localStorage.setItem("email", label);
-        navigate("/verify-2fa", { state: { email: label } });
+        navigate("/verify-2fa", { state: { email: user.email } });
         setLoading(false);
         return;
       }
@@ -168,8 +172,7 @@ const SignIn = () => {
     setShowGuestModal(false);
     if (pending2FA) {
       console.log("Modal closed, redirecting to 2FA");
-      localStorage.setItem("email", email);
-      navigate("/", { state: { email } });
+      navigate("/verify-2fa", { state: { email: localStorage.getItem("email") } });
       setPending2FA(false);
     } else if (path) {
       navigate(path);
