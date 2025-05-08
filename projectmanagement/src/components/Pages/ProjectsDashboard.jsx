@@ -103,8 +103,9 @@ const ProjectsDashboard = () => {
           axiosInstance.get('/api/auth/users'),
         ]);
 
-        const allProjects = projectsResponse.data || [];
-        const allUsers = usersResponse.data || [];
+        // Ensure projects and users are arrays
+        const allProjects = Array.isArray(projectsResponse.data) ? projectsResponse.data : [];
+        const allUsers = Array.isArray(usersResponse.data) ? usersResponse.data : [];
 
         let filteredProjects = allProjects;
         if (role === 'Project Manager') {
@@ -134,7 +135,7 @@ const ProjectsDashboard = () => {
 
   useEffect(() => {
     if (editingProject) {
-      setSelectedTeamMembers(editingProject.teamMembers.map(member => member._id || member));
+      setSelectedTeamMembers(Array.isArray(editingProject.teamMembers) ? editingProject.teamMembers.map(member => member._id || member) : []);
       setProjectStartDate(editingProject.startDate ? new Date(editingProject.startDate).toISOString().split('T')[0] : '');
       setProjectEndDate(editingProject.endDate ? new Date(editingProject.endDate).toISOString().split('T')[0] : '');
     } else {
@@ -200,7 +201,7 @@ const ProjectsDashboard = () => {
 
   const handleTeamSelectionChange = (e) => {
     const selected = Array.from(e.target.selectedOptions, option => option.value);
-    const teamLeaders = users.filter(user => user.role?.name === 'Team Leader').map(user => user._id);
+    const teamLeaders = Array.isArray(users) ? users.filter(user => user.role?.name === 'Team Leader').map(user => user._id) : [];
     const selectedTeamLeaders = selected.filter(id => teamLeaders.includes(id));
 
     if (selectedTeamLeaders.length > 1) {
@@ -257,7 +258,7 @@ const ProjectsDashboard = () => {
       const projectId = response.data.project._id;
 
       const matchResponse = await axiosInstance.get(`/api/projects/${projectId}/match-users`);
-      setSuggestedUsers(matchResponse.data.matchedUsers || []);
+      setSuggestedUsers(Array.isArray(matchResponse.data.matchedUsers) ? matchResponse.data.matchedUsers : []);
 
       await axiosInstance.delete(`/api/projects/${projectId}`);
     } catch (error) {
@@ -383,7 +384,7 @@ const ProjectsDashboard = () => {
   };
 
   const getStatusBadgeClass = (status) => {
-    switch (status.toLowerCase()) {
+    switch (status?.toLowerCase()) {
       case 'pending':
         return 'bg-warning';
       case 'in progress':
@@ -396,7 +397,7 @@ const ProjectsDashboard = () => {
   };
 
   const getProgressPercentage = (status) => {
-    switch (status.toLowerCase()) {
+    switch (status?.toLowerCase()) {
       case 'pending':
         return 5;
       case 'in progress':
@@ -438,8 +439,8 @@ const ProjectsDashboard = () => {
     resetModalState();
     if (project) {
       setEditingProject(project);
-      setTaskList(project.tasks || []);
-      setSelectedTeamMembers(project.teamMembers.map(member => member._id || member));
+      setTaskList(Array.isArray(project.tasks) ? project.tasks : []);
+      setSelectedTeamMembers(Array.isArray(project.teamMembers) ? project.teamMembers.map(member => member._id || member) : []);
       setProjectStartDate(project.startDate ? new Date(project.startDate).toISOString().split('T')[0] : '');
       setProjectEndDate(project.endDate ? new Date(project.endDate).toISOString().split('T')[0] : '');
     }
@@ -522,8 +523,8 @@ const ProjectsDashboard = () => {
                         aria-label="Filter by project manager"
                       >
                         <option value="">All managers</option>
-                        {users
-                          .filter(u => ['Project Manager', 'Admin'].includes(u.role?.name))
+                        {Array.isArray(users) && users
+                          .filter(u => u.role?.name && ['Project Manager', 'Admin'].includes(u.role.name))
                           .map(user => (
                             <option key={user._id} value={user._id}>
                               {user.firstname} {user.lastname}
@@ -608,8 +609,8 @@ const ProjectsDashboard = () => {
                   <p className="text-muted">No projects found.</p>
                 </div>
               )}
-              {projects.map(project => {
-                const projectManager = users.find(user => user._id === project.projectManager?._id);
+              {Array.isArray(projects) && projects.map(project => {
+                const projectManager = Array.isArray(users) ? users.find(user => user._id === project.projectManager?._id) : null;
                 return (
                   <div key={project._id} className="col-md-6 col-xl-4 project-card">
                     <div className="card hover-effect">
@@ -698,7 +699,7 @@ const ProjectsDashboard = () => {
                               className="text-dark f-w-600 cursor-pointer"
                               onClick={() => setShowMembersModal(project._id)}
                             >
-                              <i className="ti ti-brand-wechat f-s-18"></i> {project.teamMembers.length} Members
+                              <i className="ti ti-brand-wechat f-s-18"></i> {Array.isArray(project.teamMembers) ? project.teamMembers.length : 0} Members
                             </span>
                           </div>
                           <div className="col-6 d-flex justify-content-end gap-2">
@@ -822,9 +823,9 @@ const ProjectsDashboard = () => {
                                 {user.firstname} {user.lastname}
                               </strong>{' '}
                               ({user.role})<br />
-                              <small>Skills: {user.skills.join(', ')}</small>
+                              <small>Skills: {Array.isArray(user.skills) ? user.skills.join(', ') : 'None'}</small>
                               <br />
-                              <small>Corresponding skills: {user.commonSkills.join(', ')}</small>
+                              <small>Corresponding skills: {Array.isArray(user.commonSkills) ? user.commonSkills.join(', ') : 'None'}</small>
                               <br />
                               <small>Assigned tasks: {user.taskCount}</small>
                             </div>
@@ -845,21 +846,21 @@ const ProjectsDashboard = () => {
                     className="form-control"
                     id="team"
                     multiple
-                    defaultValue={editingProject?.teamMembers.map(member => member._id || member) || []}
+                    defaultValue={editingProject?.teamMembers?.map(member => member._id || member) || []}
                     style={{ height: '150px' }}
                     onChange={handleTeamSelectionChange}
                   >
-                    {users
-                      .filter(user => ['Team Leader', 'Team Member'].includes(user.role?.name))
+                    {Array.isArray(users) && users
+                      .filter(user => user.role?.name && ['Team Leader', 'Team Member'].includes(user.role.name))
                       .sort((a, b) => {
-                        const aProjects = a.managedProjects ? a.managedProjects.length : 0;
-                        const bProjects = b.managedProjects ? b.managedProjects.length : 0;
+                        const aProjects = Array.isArray(a.managedProjects) ? a.managedProjects.length : 0;
+                        const bProjects = Array.isArray(b.managedProjects) ? b.managedProjects.length : 0;
                         return aProjects - bProjects;
                       })
                       .map(user => (
                         <option key={user._id} value={user._id}>
                           {user.firstname} {user.lastname} ({user.role?.name || 'Role not defined'}) - Projects:{' '}
-                          {user.managedProjects ? user.managedProjects.length : 0}
+                          {Array.isArray(user.managedProjects) ? user.managedProjects.length : 0}
                         </option>
                       ))}
                   </select>
@@ -958,7 +959,7 @@ const ProjectsDashboard = () => {
                         }
                         style={{ height: '100px' }}
                       >
-                        {selectedTeamMembers.length > 0 ? (
+                        {selectedTeamMembers.length > 0 && Array.isArray(users) ? (
                           users
                             .filter(user => selectedTeamMembers.includes(user._id) && user.role?.name === 'Team Member')
                             .map(user => (
@@ -1009,7 +1010,7 @@ const ProjectsDashboard = () => {
                             {task.assignedTo.length > 0 &&
                               ` - Assigned to: ${task.assignedTo
                                 .map(userId => {
-                                  const user = users.find(u => u._id === userId);
+                                  const user = Array.isArray(users) ? users.find(u => u._id === userId) : null;
                                   return user ? `${user.firstname} ${user.lastname}` : 'Unknown';
                                 })
                                 .join(', ')}`}
