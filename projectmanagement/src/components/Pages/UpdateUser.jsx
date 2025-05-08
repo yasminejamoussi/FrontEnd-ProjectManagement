@@ -10,36 +10,43 @@ import Header from "../Layout/Header";
 import Sidebar from '../Layout/SideBar';
 
 const UpdateUser = () => {
-  const { id } = useParams(); // Récupérer l'ID de l'utilisateur depuis l'URL
-  const navigate = useNavigate(); // Pour rediriger après la mise à jour
+  const { id } = useParams();
+  const navigate = useNavigate();
 
-  // État pour stocker l'utilisateur
   const [user, setUser] = useState({ firstname: "", lastname: "", phone: "", email: "", role: "" });
+  const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [formErrors, setFormErrors] = useState({}); // Pour stocker les erreurs de validation
+  const [formErrors, setFormErrors] = useState({});
 
-  // Regex pour la validation
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const phoneRegex = /^[+]?[\d\s-]{8,15}$/;
 
-  // Récupération des données de l'utilisateur spécifique
+  // Récupérer les données de l'utilisateur et les rôles
   useEffect(() => {
     const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL;
-    axios
-       .get(`${apiBaseUrl}/api/auth/users/${id}`) // Récupère l'utilisateur spécifique
-      .then((response) => {
-        setUser(response.data); // Mettre à jour l'état avec les données reçues
+
+    // Récupérer l'utilisateur
+    const fetchUser = axios.get(`${apiBaseUrl}/api/auth/users/${id}`);
+    // Récupérer les rôles
+    const fetchRoles = axios.get(`${apiBaseUrl}/api/roles`); // Assumes an endpoint to list roles
+
+    Promise.all([fetchUser, fetchRoles])
+      .then(([userResponse, rolesResponse]) => {
+        setUser({
+          ...userResponse.data,
+          role: userResponse.data.role?.name || "" // Utiliser le nom du rôle
+        });
+        setRoles(rolesResponse.data || []);
         setLoading(false);
       })
       .catch((error) => {
-        console.error("Erreur lors du chargement de l'utilisateur:", error);
+        console.error("Erreur lors du chargement des données:", error);
         setError("Impossible de charger les données.");
         setLoading(false);
       });
   }, [id]);
 
-  // Validation des champs
   const validateForm = () => {
     const errors = {};
 
@@ -59,29 +66,30 @@ const UpdateUser = () => {
     } else if (!emailRegex.test(user.email)) {
       errors.email = "L'email est invalide.";
     }
+    if (!user.role) {
+      errors.role = "Le rôle est requis.";
+    }
 
     setFormErrors(errors);
-    return Object.keys(errors).length === 0; // Retourne true si aucune erreur
+    return Object.keys(errors).length === 0;
   };
 
-  // Gestion de la soumission du formulaire
   const handleSubmit = async (e) => {
-    e.preventDefault(); // Empêcher le rechargement de la page
+    e.preventDefault();
 
     if (!validateForm()) {
-      return; // Ne pas soumettre le formulaire si des erreurs sont présentes
+      return;
     }
 
     try {
-      const token = localStorage.getItem("token"); // Récupérer le token d'authentification
+      const token = localStorage.getItem("token");
       const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL;
-      // Requête PUT pour mettre à jour l'utilisateur
       const response = await axios.put(
         `${apiBaseUrl}/api/auth/users/${id}`,
         user,
         {
           headers: {
-            Authorization: `Bearer ${token}`, // Authentification
+            Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
         }
@@ -89,15 +97,14 @@ const UpdateUser = () => {
 
       if (response.status === 200) {
         alert("Utilisateur mis à jour avec succès !");
-        navigate("/users"); // Rediriger vers la liste des utilisateurs
+        navigate("/users");
       }
     } catch (error) {
       console.error("Erreur lors de la mise à jour de l'utilisateur:", error);
-      alert("Une erreur est survenue lors de la mise à jour.");
+      alert(error.response?.data?.message || "Une erreur est survenue lors de la mise à jour.");
     }
   };
 
-  // Gestion des changements dans les champs du formulaire
   const handleChange = (e) => {
     const { name, value } = e.target;
     setUser((prevUser) => ({
@@ -111,13 +118,9 @@ const UpdateUser = () => {
 
   return (
     <div className="app-wrapper">
-      {/* App Loader */}
-      
-      <SideBar />
-      
+      <Sidebar />
       <div className="app-content">
         <Header />
-
         <main>
           <div className="container-fluid">
             <div className="row m-1">
@@ -155,7 +158,7 @@ const UpdateUser = () => {
                           </div>
                           <div className="person-details">
                             <h5 className="f-w-600">
-                              Ninfa Monaldo
+                              {user.firstname} {user.lastname}
                               <img
                                 width="20"
                                 height="20"
@@ -163,9 +166,8 @@ const UpdateUser = () => {
                                 alt="instagram-check-mark"
                               />
                             </h5>
-                            <p>Web designer & Developer</p>
+                            <p>{user.role || "Rôle non défini"}</p>
                           </div>
-                          
                           <form className="app-form" onSubmit={handleSubmit}>
                             <h5 className="mb-2 text-dark f-w-600">User Info</h5>
                             <div className="row">
@@ -233,7 +235,27 @@ const UpdateUser = () => {
                                   )}
                                 </div>
                               </div>
-                             
+                              <div className="col-12">
+                                <div className="mb-3">
+                                  <label className="form-label">Role</label>
+                                  <select
+                                    className="form-control"
+                                    name="role"
+                                    value={user.role}
+                                    onChange={handleChange}
+                                  >
+                                    <option value="">Sélectionner un rôle</option>
+                                    {roles.map((role) => (
+                                      <option key={role._id} value={role.name}>
+                                        {role.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  {formErrors.role && (
+                                    <small className="text-danger">{formErrors.role}</small>
+                                  )}
+                                </div>
+                              </div>
                               <div className="col-12">
                                 <div className="text-end">
                                   <button type="submit" className="btn btn-primary">Submit</button>
@@ -251,13 +273,11 @@ const UpdateUser = () => {
           </div>
         </main>
       </div>
-
       <div className="go-top">
         <span className="progress-value">
           <i className="ti ti-arrow-up"></i>
         </span>
       </div>
-      
     </div>
   );
 };
