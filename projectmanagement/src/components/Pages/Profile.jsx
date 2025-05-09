@@ -11,7 +11,38 @@ import UserProfileForm from "../Pages/UserProfileForm";
 import Avatar from '../../assets/images/avtar/user.jpg';
 import { Modal, Button } from 'react-bootstrap';
 
+// Configure Axios avec la base URL depuis les variables d'environnement Vite
 const API_BASE_URL = import.meta.env.VITE_REACT_APP_API_URL || 'https://backend-projectmanagement-mg0q.onrender.com';
+const axiosInstance = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Intercepteur de requête pour ajouter le token JWT
+axiosInstance.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Intercepteur de réponse pour gérer l'expiration du token
+axiosInstance.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
 
 const Profile = ({ userId }) => {
   const [activeTab, setActiveTab] = useState('profile-tab-pane');
@@ -40,9 +71,7 @@ const Profile = ({ userId }) => {
     }
 
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/profile`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await axiosInstance.get('/api/profile');
       setPreview(response.data.profileImage || "");
       setCvPreview(response.data.cv || "");
       setUserData(response.data);
@@ -89,10 +118,9 @@ const Profile = ({ userId }) => {
     formData.append("image", image);
 
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/profile/upload`, formData, {
+      const response = await axiosInstance.post('/api/profile/upload', formData, {
         headers: {
           "Content-Type": "multipart/form-data",
-          Authorization: `Bearer ${token}`,
         },
       });
 
@@ -112,10 +140,7 @@ const Profile = ({ userId }) => {
     }
 
     try {
-      const response = await axios.delete(`${API_BASE_URL}/api/profile/delete-image`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
+      const response = await axiosInstance.delete('/api/profile/delete-image');
       setPreview("");
       setImage(null);
       setImageNotification({ message: "Profile image deleted successfully!", type: "success" });
@@ -143,10 +168,9 @@ const Profile = ({ userId }) => {
     formData.append("cv", cv);
 
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/profile/upload-cv`, formData, {
+      const response = await axiosInstance.post('/api/profile/upload-cv', formData, {
         headers: {
           "Content-Type": "multipart/form-data",
-          Authorization: `Bearer ${token}`,
         },
       });
 
@@ -173,12 +197,7 @@ const Profile = ({ userId }) => {
 
     try {
       if (!isTwoFactorEnabled) {
-        const response = await axios.post(
-          `${API_BASE_URL}/api/auth/generate-2fa`,
-          { email: userData.email },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-
+        const response = await axiosInstance.post('/api/auth/generate-2fa', { email: userData.email });
         if (response.data.qrCode) {
           localStorage.setItem("qrCode", response.data.qrCode);
           localStorage.setItem("email", userData.email);
@@ -187,12 +206,7 @@ const Profile = ({ userId }) => {
           throw new Error("Failed to generate QR code.");
         }
       } else {
-        const response = await axios.post(
-          `${API_BASE_URL}/api/auth/disable-2fa`,
-          { email: userData.email },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-
+        const response = await axiosInstance.post('/api/auth/disable-2fa', { email: userData.email });
         if (response.data.message) {
           setIsTwoFactorEnabled(false);
           setUserData({ ...userData, isTwoFactorEnabled: false });
