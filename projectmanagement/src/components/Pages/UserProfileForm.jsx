@@ -10,6 +10,9 @@ const UserProfileForm = () => {
   const [showEmailWarning, setShowEmailWarning] = useState(false);
   const [showRoleWarning, setShowRoleWarning] = useState(false);
 
+  // Define the API base URL using the deployed backend URL
+  const API_BASE_URL = "https://backend-projectmanagement-mg0q.onrender.com";
+
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
@@ -19,7 +22,7 @@ const UserProfileForm = () => {
           return;
         }
 
-        const response = await axios.get("http://localhost:4000/api/profile", {
+        const response = await axios.get(`${API_BASE_URL}/api/profile`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -44,7 +47,7 @@ const UserProfileForm = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.put(
-        "http://localhost:4000/api/profile/update",
+        `${API_BASE_URL}/api/profile/update`,
         updatedUser,
         { headers: { Authorization: `Bearer ${token}` } }
       );

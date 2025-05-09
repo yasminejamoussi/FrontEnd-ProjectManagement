@@ -33,6 +33,9 @@ const Dashboard = () => {
   const projectsPerPage = 10;
   const navigate = useNavigate();
 
+  // Define the API base URL using the deployed backend URL
+  const API_BASE_URL = "https://backend-projectmanagement-mg0q.onrender.com";
+
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -45,16 +48,16 @@ const Dashboard = () => {
         setLoading(true);
 
         const [userResponse, projectsResponse, tasksResponse, usersResponse] = await Promise.all([
-          axios.get('http://localhost:4000/api/profile', {
+          axios.get(`${API_BASE_URL}/api/profile`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          axios.get('http://localhost:4000/api/projects', {
+          axios.get(`${API_BASE_URL}/api/projects`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          axios.get('http://localhost:4000/api/tasks', {
+          axios.get(`${API_BASE_URL}/api/tasks`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          axios.get('http://localhost:4000/api/auth/users', {
+          axios.get(`${API_BASE_URL}/api/auth/users`, {
             headers: { Authorization: `Bearer ${token}` },
           }).catch(() => ({ data: [] })),
         ]);
@@ -192,7 +195,7 @@ const Dashboard = () => {
     const token = localStorage.getItem('token');
     try {
       const response = await axios.put(
-        `http://localhost:4000/api/tasks/${selectedTask._id}`,
+        `${API_BASE_URL}/api/tasks/${selectedTask._id}`,
         taskForm,
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -212,7 +215,7 @@ const Dashboard = () => {
     if (!selectedTask) return;
     const token = localStorage.getItem('token');
     try {
-      await axios.delete(`http://localhost:4000/api/tasks/${selectedTask._id}`, {
+      await axios.delete(`${API_BASE_URL}/api/tasks/${selectedTask._id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setAllTasks((prevTasks) => prevTasks.filter((task) => task._id !== selectedTask._id));
@@ -577,6 +580,7 @@ const Dashboard = () => {
                             <th scope="col">Project Owner</th>
                             <th scope="col">Start Date</th>
                             <th scope="col">End Date</th>
+                            <th scope="col">Description</th>
                             <th scope="col">Delay Risk</th>
                           </tr>
                         </thead>
@@ -643,6 +647,12 @@ const Dashboard = () => {
                                         year: 'numeric',
                                       })
                                     : 'Not Set'}
+                                </td>
+                                <td>
+                                  <span className="text-dark f-s-14 f-w-500 text-nowrap">
+                                    <CircleDashed className="me-2 f-s-6" />
+                                    {DOMPurify.sanitize(project.description || 'No description available')}
+                                  </span>
                                 </td>
                                 <td>
                                   <span
