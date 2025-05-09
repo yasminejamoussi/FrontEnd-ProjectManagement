@@ -26,8 +26,8 @@ const ProjectDetails = () => {
       console.log("ID du projet :", id);
       try {
         const [projectResponse, usersResponse] = await Promise.all([
-          axios.get(`http://localhost:4000/api/projects/${id}`),
-          axios.get("http://localhost:4000/api/auth/users"),
+          axios.get(`${import.meta.env.VITE_REACT_APP_API_URL}/api/projects/${id}`),
+          axios.get(`${import.meta.env.VITE_REACT_APP_API_URL}/api/auth/users`),
         ]);
         console.log("Réponse projet complète :", projectResponse.data);
         console.log("teamMembers brut :", projectResponse.data.teamMembers);
@@ -67,7 +67,7 @@ const ProjectDetails = () => {
     if (window.confirm(`Are you sure you want to remove this team member ?`)) {
       try {
         const updatedTeam = teamMembers.filter(member => member._id !== memberId);
-        await axios.put(`http://localhost:4000/api/projects/${id}`, { teamMembers: updatedTeam.map(m => m._id) });
+        await axios.put(`${import.meta.env.VITE_REACT_APP_API_URL}/api/projects/${id}`, { teamMembers: updatedTeam.map(m => m._id) });
 
         // Update team members
         setTeamMembers(updatedTeam);
@@ -97,7 +97,7 @@ const ProjectDetails = () => {
       try {
         const memberToAdd = availableMembers.find(member => member._id === selectedMember);
         const updatedTeam = [...teamMembers, memberToAdd];
-        await axios.put(`http://localhost:4000/api/projects/${id}`, { teamMembers: updatedTeam.map(m => m._id) });
+        await axios.put(`${import.meta.env.VITE_REACT_APP_API_URL}/api/projects/${id}`, { teamMembers: updatedTeam.map(m => m._id) });
 
         // Update team members
         setTeamMembers(updatedTeam);

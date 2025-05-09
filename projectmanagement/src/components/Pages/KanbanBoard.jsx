@@ -93,9 +93,9 @@ const KanbanBoard = () => {
     const fetchData = async () => {
       try {
         const [tasksResponse, projectResponse, usersResponse] = await Promise.all([
-          axios.get(`http://localhost:4000/api/tasks?projectId=${projectId}`),
-          axios.get(`http://localhost:4000/api/projects/${projectId}`),
-          axios.get('http://localhost:4000/api/auth/users'),
+          axios.get(`${import.meta.env.VITE_REACT_APP_API_URL}/api/tasks?projectId=${projectId}`),
+          axios.get(`${import.meta.env.VITE_REACT_APP_API_URL}/api/projects/${projectId}`),
+          axios.get(`${import.meta.env.VITE_REACT_APP_API_URL}/api/auth/users`),
         ]);
 
         const normalizedTasks = (tasksResponse.data || []).map(task => ({
@@ -143,7 +143,7 @@ const KanbanBoard = () => {
             try {
               const token = localStorage.getItem("token");
               await axios.put(
-                `http://localhost:4000/api/tasks/${taskId}`,
+                `${import.meta.env.VITE_REACT_APP_API_URL}/api/tasks/${taskId}`,
                 { status: newStatus },
                 { headers: { Authorization: `Bearer ${token}` } }
               );
@@ -203,7 +203,7 @@ const KanbanBoard = () => {
     }
 
     try {
-      const response = await axios.post('http://localhost:4000/api/prioritize', {
+      const response = await axios.post(`${import.meta.env.VITE_REACT_APP_API_URL}/api/prioritize`, {
         title: task.title,
         description: task.description || '',
       });
@@ -240,7 +240,7 @@ const KanbanBoard = () => {
         project: projectId,
         startDate: task.startDate,
       });
-      const response = await axios.post('http://localhost:4000/api/tasks/predict-duration', {
+      const response = await axios.post(`${import.meta.env.VITE_REACT_APP_API_URL}/api/tasks/predict-duration`, {
         title: task.title,
         description: task.description || '',
         status: task.status,
@@ -269,7 +269,7 @@ const KanbanBoard = () => {
     setProductivityLoading(true);
     setProductivityError(null);
     try {
-      const response = await axios.get(`http://localhost:4000/api/productivity/${projectId}`);
+      const response = await axios.get(`${import.meta.env.VITE_REACT_APP_API_URL}/api/productivity/${projectId}`);
       console.log('Productivity data received:', response.data);
       setProductivityData([response.data]);
     } catch (err) {
@@ -334,7 +334,7 @@ const KanbanBoard = () => {
 
     try {
       if (editTask) {
-        const response = await axios.put(`http://localhost:4000/api/tasks/${editTask._id}`, taskData);
+        const response = await axios.put(`${import.meta.env.VITE_REACT_APP_API_URL}/api/tasks/${editTask._id}`, taskData);
         setTasks(prevTasks => prevTasks.map(task => task._id === editTask._id ? {
           ...response.data,
           startDate: response.data.startDate ? new Date(response.data.startDate).toISOString().split('T')[0] : '',
@@ -343,7 +343,7 @@ const KanbanBoard = () => {
         setEditTask(null);
       } else {
         const taskToCreate = { ...taskData, project: projectId, createdBy: currentUserId };
-        const response = await axios.post('http://localhost:4000/api/tasks', taskToCreate);
+        const response = await axios.post(`${import.meta.env.VITE_REACT_APP_API_URL}/api/tasks`, taskToCreate);
         setTasks(prevTasks => [...prevTasks, {
           ...response.data,
           startDate: response.data.startDate ? new Date(response.data.startDate).toISOString().split('T')[0] : '',
@@ -367,7 +367,7 @@ const KanbanBoard = () => {
 
   const handleDelete = async (taskId) => {
     try {
-      await axios.delete(`http://localhost:4000/api/tasks/${taskId}`);
+      await axios.delete(`${import.meta.env.VITE_REACT_APP_API_URL}/api/tasks/${taskId}`);
       setTasks(prevTasks => prevTasks.filter(task => task._id !== taskId));
       setRenderKey(prev => prev + 1);
     } catch (err) {
