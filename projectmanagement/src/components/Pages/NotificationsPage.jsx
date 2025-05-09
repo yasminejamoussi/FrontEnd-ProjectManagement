@@ -23,17 +23,20 @@ const NotificationsPage = () => {
   const [totalPages, setTotalPages] = useState(1);
   const notificationsPerPage = 10;
 
+  // Define the API base URL using the deployed backend URL
+  const API_BASE_URL = "https://backend-projectmanagement-mg0q.onrender.com";
+
   // Fonction pour récupérer les notifications dynamiques (comme dans Header)
   const fetchDynamicNotifications = async () => {
     try {
       console.log('Fetching projects...');
-      const projectsResponse = await axios.get('http://localhost:4000/api/projects');
+      const projectsResponse = await axios.get(`${API_BASE_URL}/api/projects`);
       console.log('Projects received:', projectsResponse.data);
       const projects = projectsResponse.data;
 
       const projectDelayPromises = projects.map(async (project) => {
         try {
-          const delayResponse = await axios.get(`http://localhost:4000/api/projects/${project._id}/predict-delay`);
+          const delayResponse = await axios.get(`${API_BASE_URL}/api/projects/${project._id}/predict-delay`);
           console.log(`Project ${project.name} prediction:`, delayResponse.data);
           if (delayResponse.data.riskOfDelay === 'Oui') {
             return {
@@ -57,13 +60,13 @@ const NotificationsPage = () => {
       });
 
       console.log('Fetching tasks...');
-      const tasksResponse = await axios.get('http://localhost:4000/api/tasks');
+      const tasksResponse = await axios.get(`${API_BASE_URL}/api/tasks`);
       console.log('Tasks received:', tasksResponse.data);
       const tasks = tasksResponse.data;
 
       const taskDelayPromises = tasks.map(async (task) => {
         try {
-          const delayResponse = await axios.get(`http://localhost:4000/api/tasks/${task._id}/predict-delay`);
+          const delayResponse = await axios.get(`${API_BASE_URL}/api/tasks/${task._id}/predict-delay`);
           console.log(`Task ${task.title} prediction:`, delayResponse.data);
           if (delayResponse.data.riskOfDelay === 'Oui') {
             const assignedToNames = task.assignedTo.map(user => ` ${user.firstname} ${user.lastname}`).join(', ') || 'Unknown';
@@ -112,7 +115,7 @@ const NotificationsPage = () => {
 
       try {
         // Récupérer le profil utilisateur
-        const userResponse = await axios.get('http://localhost:4000/api/profile', {
+        const userResponse = await axios.get(`${API_BASE_URL}/api/profile`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -124,7 +127,7 @@ const NotificationsPage = () => {
         const dynamicNotifications = await fetchDynamicNotifications();
 
         // Récupérer les notifications persistantes (par exemple, anomalies)
-        const persistentResponse = await axios.get('http://localhost:4000/api/notifications/my-notifications', {
+        const persistentResponse = await axios.get(`${API_BASE_URL}/api/notifications/my-notifications`, {
           headers: { Authorization: `Bearer ${token}` },
           params: {
             page: currentPage,
@@ -206,7 +209,7 @@ const NotificationsPage = () => {
       try {
         const token = localStorage.getItem('token');
         await axios.put(
-          `http://localhost:4000/api/notifications/mark-read/${notificationId}`,
+          `${API_BASE_URL}/api/notifications/mark-read/${notificationId}`,
           {},
           {
             headers: { Authorization: `Bearer ${token}` },

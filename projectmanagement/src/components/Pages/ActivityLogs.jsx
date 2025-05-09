@@ -28,6 +28,9 @@ const ActivityLogs = () => {
   const logsPerPage = 10;
   const [selectedLogs, setSelectedLogs] = useState([]);
 
+  // Define the API base URL using the deployed backend URL
+  const API_BASE_URL = "https://backend-projectmanagement-mg0q.onrender.com";
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -41,16 +44,16 @@ const ActivityLogs = () => {
 
       try {
         const [userResponse, projectsResponse, tasksResponse, usersResponse] = await Promise.all([
-          axios.get('http://localhost:4000/api/profile', {
+          axios.get(`${API_BASE_URL}/api/profile`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          axios.get('http://localhost:4000/api/projects', {
+          axios.get(`${API_BASE_URL}/api/projects`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          axios.get('http://localhost:4000/api/tasks', {
+          axios.get(`${API_BASE_URL}/api/tasks`, {
             headers: { Authorization: `Bearer ${token}` },
           }).catch(() => ({ data: [] })),
-          axios.get('http://localhost:4000/api/auth/users', {
+          axios.get(`${API_BASE_URL}/api/auth/users`, {
             headers: { Authorization: `Bearer ${token}` },
           }).catch(() => ({ data: [] })),
         ]);
@@ -64,7 +67,7 @@ const ActivityLogs = () => {
         setAllUsers(usersResponse.data);
 
         // Récupérer les logs avec pagination
-        const logsResponse = await axios.get('http://localhost:4000/api/logs/activity-logs', {
+        const logsResponse = await axios.get(`${API_BASE_URL}/api/logs/activity-logs`, {
           params: { 
             userId: user._id, 
             page: currentPage, 
@@ -152,7 +155,7 @@ const ActivityLogs = () => {
 
     try {
       console.log('Deleting logs with IDs:', selectedLogs, 'for userId:', userId);
-      const response = await axios.delete('http://localhost:4000/api/logs/activity-logs/delete', {
+      const response = await axios.delete(`${API_BASE_URL}/api/logs/activity-logs/delete`, {
         data: { logIds: selectedLogs, userId: userId },
       });
       console.log('Delete response:', response.data);

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import axios from 'axios'; // Pour les appels API
 import LogoNoir from '../../assets/images/logo/LogoNoir.png';
+
 const PasswordReset = () => {
   const [formData, setFormData] = useState({
     newPassword: '',
@@ -13,8 +14,11 @@ const PasswordReset = () => {
 
   // Récupérer le code de réinitialisation et l'email depuis l'état de la navigation
   const location = useLocation();
-// Récupérer le code de réinitialisation  
+  // Récupérer le code de réinitialisation  
   const { resetCode, email } = location.state || {};  // Récupérer l'email (valeur par défaut si non défini)
+
+  // Define the API base URL using the deployed backend URL
+  const API_BASE_URL = "https://backend-projectmanagement-mg0q.onrender.com";
 
   useEffect(() => {
     if (!resetCode) {
@@ -39,7 +43,7 @@ const PasswordReset = () => {
 
     try {
       // Remplacer par votre point de terminaison API réel
-      const response = await axios.post('http://localhost:4000/api/auth/reset-password', {
+      const response = await axios.post(`${API_BASE_URL}/api/auth/reset-password`, {
         email: email, // L'email dynamique de l'utilisateur
         resetCode: resetCode, // Le code de réinitialisation passé depuis la page précédente
         newPassword: formData.newPassword
