@@ -11,7 +11,7 @@ import UserProfileForm from "../Pages/UserProfileForm";
 import Avatar from '../../assets/images/avtar/user.jpg';
 import { Modal, Button } from 'react-bootstrap';
 
-const API_BASE_URL = import.meta.env.VITE_REACT_APP_API_URL ;
+const API_BASE_URL = import.meta.env.VITE_REACT_APP_API_URL || 'https://backend-projectmanagement-mg0q.onrender.com';
 
 const Profile = ({ userId }) => {
   const [activeTab, setActiveTab] = useState('profile-tab-pane');
