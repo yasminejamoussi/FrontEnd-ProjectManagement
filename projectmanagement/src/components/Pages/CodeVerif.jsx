@@ -14,6 +14,9 @@ const CodeVerification = () => {
   const navigate = useNavigate();
   const email = location.state?.email || "defaultEmail@example.com"; // Récupérer l'email du paramètre d'état
 
+  // Define the API base URL using the deployed backend URL
+  const API_BASE_URL = "https://backend-projectmanagement-mg0q.onrender.com";
+
   // digitValidate : Assurer que seuls les chiffres sont saisis
   const digitValidate = (value) => {
     return value.replace(/[^0-9]/g, ''); // Remplacer les caractères non numériques
@@ -54,7 +57,7 @@ const CodeVerification = () => {
 
     try {
       // Appel à l'API de vérification
-      const response = await axios.post('http://localhost:4000/api/auth/verify-code', { email, resetCode: resetCodeString });
+      const response = await axios.post(`${API_BASE_URL}/api/auth/verify-code`, { email, resetCode: resetCodeString });
 
       if (response.status === 200) {
         setMessage('The reset code has been successfully verified.');
@@ -133,8 +136,6 @@ const CodeVerification = () => {
                         <p className="text-danger">{error}</p>
                       </Col>
                     )}
-
-                    
 
                     {/* Bouton de vérification */}
                     <Col xs={12}>

@@ -25,6 +25,9 @@ const Report = () => {
   });
   const reportRef = useRef(null);
 
+  // Define the API base URL using the deployed backend URL
+  const API_BASE_URL = "https://backend-projectmanagement-mg0q.onrender.com";
+
   useEffect(() => {
     const fetchReport = async () => {
       setLoading(true);
@@ -33,7 +36,7 @@ const Report = () => {
         if (!token) {
           throw new Error('No token available');
         }
-        const response = await axios.get('http://localhost:4000/api/projects/reports/overview', {
+        const response = await axios.get(`${API_BASE_URL}/api/projects/reports/overview`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (!response.data) {
@@ -358,46 +361,44 @@ const Report = () => {
               <div className="text-center">
                 <div className="export-options">
                   <h3>Export Options</h3>
-                  <div className="checkbox-container">
-                    <div className="form-check">
-                      <input
-                        type="checkbox"
-                        className="form-check-input"
-                        id="metrics"
-                        name="metrics"
-                        checked={exportOptions.metrics}
-                        onChange={handleExportOptionChange}
-                      />
-                      <label className="form-check-label" htmlFor="metrics">
-                        Include Metrics
-                      </label>
-                    </div>
-                    <div className="form-check">
-                      <input
-                        type="checkbox"
-                        className="form-check-input"
-                        id="charts"
-                        name="charts"
-                        checked={exportOptions.charts}
-                        onChange={handleExportOptionChange}
-                      />
-                      <label className="form-check-label" htmlFor="charts">
-                        Include Charts
-                      </label>
-                    </div>
-                    <div className="form-check">
-                      <input
-                        type="checkbox"
-                        className="form-check-input"
-                        id="projectDetails"
-                        name="projectDetails"
-                        checked={exportOptions.projectDetails}
-                        onChange={handleExportOptionChange}
-                      />
-                      <label className="form-check-label" htmlFor="projectDetails">
-                        Include Project Details & Annotations
-                      </label>
-                    </div>
+                  <div className="form-check">
+                    <input
+                      type="checkbox"
+                      className="form-check-input"
+                      id="metrics"
+                      name="metrics"
+                      checked={exportOptions.metrics}
+                      onChange={handleExportOptionChange}
+                    />
+                    <label className="form-check-label" htmlFor="metrics">
+                      Include Metrics
+                    </label>
+                  </div>
+                  <div className="form-check">
+                    <input
+                      type="checkbox"
+                      className="form-check-input"
+                      id="charts"
+                      name="charts"
+                      checked={exportOptions.charts}
+                      onChange={handleExportOptionChange}
+                    />
+                    <label className="form-check-label" htmlFor="charts">
+                      Include Charts
+                    </label>
+                  </div>
+                  <div className="form-check">
+                    <input
+                      type="checkbox"
+                      className="form-check-input"
+                      id="projectDetails"
+                      name="projectDetails"
+                      checked={exportOptions.projectDetails}
+                      onChange={handleExportOptionChange}
+                    />
+                    <label className="form-check-label" htmlFor="projectDetails">
+                      Include Project Details & Annotations
+                    </label>
                   </div>
                 </div>
                 <button onClick={exportPDF} className="btn btn-primary m-2">

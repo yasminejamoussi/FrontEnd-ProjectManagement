@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate,useLocation } from 'react-router-dom'; // Import useNavigate from react-router-dom
+import { Link, useNavigate, useLocation } from 'react-router-dom'; // Import useNavigate from react-router-dom
 import axios from 'axios'; // Ensure axios is installed
 import LogoNoir from '../../assets/images/logo/LogoNoir.png';
 
@@ -8,11 +8,15 @@ const EmailSend = () => {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate(); // Initialize useNavigate hook
+
+  // Define the API base URL using the deployed backend URL
+  const API_BASE_URL = "https://backend-projectmanagement-mg0q.onrender.com";
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     try {
-      const response = await axios.post('http://localhost:4000/api/auth/forgot-password', { email });
+      const response = await axios.post(`${API_BASE_URL}/api/auth/forgot-password`, { email });
      
       if (response.status === 200) {
         setMessage("A reset code has been sent to your email!");

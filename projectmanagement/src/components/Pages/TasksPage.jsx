@@ -25,6 +25,9 @@ const TasksPage = () => {
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
 
+  // Define the API base URL using the deployed backend URL
+  const API_BASE_URL = "https://backend-projectmanagement-mg0q.onrender.com";
+
   useEffect(() => {
     if (!token) {
       navigate('/login');
@@ -35,7 +38,7 @@ const TasksPage = () => {
       try {
         setLoading(true);
 
-        const userResponse = await axios.get('http://localhost:4000/api/profile', {
+        const userResponse = await axios.get(`${API_BASE_URL}/api/profile`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const user = userResponse.data;
@@ -50,28 +53,28 @@ const TasksPage = () => {
 
         let usersToShow = [];
         if (user.role.name === 'Admin') {
-          const usersResponse = await axios.get('http://localhost:4000/api/auth/users', {
+          const usersResponse = await axios.get(`${API_BASE_URL}/api/auth/users`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           usersToShow = usersResponse.data || [];
         } else if (user.role.name === 'Project Manager') {
-          const projectsResponse = await axios.get('http://localhost:4000/api/projects', {
+          const projectsResponse = await axios.get(`${API_BASE_URL}/api/projects`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           const managedProjects = projectsResponse.data.filter(project => project.projectManager?._id === user._id);
           const projectIds = managedProjects.map(project => project._id);
 
-          const tasksResponse = await axios.get('http://localhost:4000/api/tasks', {
+          const tasksResponse = await axios.get(`${API_BASE_URL}/api/tasks`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           const projectTasks = tasksResponse.data.filter(task => projectIds.includes(task.project?._id));
           const userIds = [...new Set(projectTasks.flatMap(task => task.assignedTo.map(u => u._id)))];
-          const usersResponse = await axios.get('http://localhost:4000/api/auth/users', {
+          const usersResponse = await axios.get(`${API_BASE_URL}/api/auth/users`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           usersToShow = usersResponse.data.filter(u => userIds.includes(u._id)) || [];
         } else if (user.role.name === 'Team Leader') {
-          const usersResponse = await axios.get('http://localhost:4000/api/auth/users', {
+          const usersResponse = await axios.get(`${API_BASE_URL}/api/auth/users`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           usersToShow = usersResponse.data.filter(u => u.teamLeader?._id === user._id || u._id === user._id) || [];
@@ -80,7 +83,7 @@ const TasksPage = () => {
         }
         setUsers(usersToShow);
 
-        const projectsResponse = await axios.get('http://localhost:4000/api/projects', {
+        const projectsResponse = await axios.get(`${API_BASE_URL}/api/projects`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         let projectsToShow = [];
@@ -89,7 +92,7 @@ const TasksPage = () => {
         } else if (user.role.name === 'Project Manager') {
           projectsToShow = projectsResponse.data.filter(project => project.projectManager?._id === user._id) || [];
         } else if (user.role.name === 'Team Leader' || user.role.name === 'Team Member') {
-          const tasksResponse = await axios.get('http://localhost:4000/api/tasks', {
+          const tasksResponse = await axios.get(`${API_BASE_URL}/api/tasks`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           let userTasks = [];
@@ -105,7 +108,7 @@ const TasksPage = () => {
         }
         setProjects(projectsToShow);
 
-        const tasksResponse = await axios.get('http://localhost:4000/api/tasks', {
+        const tasksResponse = await axios.get(`${API_BASE_URL}/api/tasks`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         let tasksToShow = [];
