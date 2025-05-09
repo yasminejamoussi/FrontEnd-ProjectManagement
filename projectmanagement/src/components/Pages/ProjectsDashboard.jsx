@@ -6,8 +6,6 @@ import { jwtDecode } from "jwt-decode";
 import Header from "../Layout/Header";
 import Sidebar from '../Layout/SideBar';
 import user from '../../assets/images/avtar/user.jpg';
-
-// Importation correcte de Modal et Button depuis react-bootstrap
 import Modal from 'react-bootstrap/Modal';
 import Button from 'react-bootstrap/Button';
 

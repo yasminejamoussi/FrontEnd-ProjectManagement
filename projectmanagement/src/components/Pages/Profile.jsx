@@ -12,7 +12,7 @@ import Avatar from '../../assets/images/avtar/user.jpg';
 import { Modal, Button } from 'react-bootstrap';
 
 // Configure Axios avec la base URL depuis les variables d'environnement Vite
-const API_BASE_URL = import.meta.env.VITE_REACT_APP_API_URL || 'https://backend-projectmanagement-mg0q.onrender.com';
+const API_BASE_URL = import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:4000';
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
   headers: {
