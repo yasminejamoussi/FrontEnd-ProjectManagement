@@ -1,8 +1,8 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_REACT_APP_API_URL , 
+  baseURL: import.meta.env.VITE_REACT_APP_API_URL,
 });
 
 // Authentification Google
-export const googleAuth = (code) => api.get(`/google?code=${code}`);
+export const googleAuth = (code) => api.get(`/api/auth/google?code=${code}`);
