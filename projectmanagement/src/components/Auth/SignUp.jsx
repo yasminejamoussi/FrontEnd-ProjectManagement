@@ -1,9 +1,7 @@
 import LogoNoir from '../../assets/images/logo/LogoNoir.png';
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useGoogleLogin } from '@react-oauth/google';
-import { googleAuth } from '../../api';
-import { FaCopy } from "react-icons/fa"; // Import de l'icône
+import { FaCopy } from "react-icons/fa";
 import axios from 'axios';
 import "../../assets/css/style.css";
 
@@ -28,7 +26,7 @@ const SignUp = () => {
     console.log("Form Data:", formData);
 
     try {
-      const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL ;
+      const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL;
       const response = await fetch(`${apiBaseUrl}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -41,7 +39,7 @@ const SignUp = () => {
 
       if (response.ok) {
         alert('Registration successful');
-        window.location.href = '/signin';
+        navigate('/signin');
       } else {
         alert(data.message || 'Something went wrong');
       }
@@ -66,45 +64,35 @@ const SignUp = () => {
     }));
   };
 
-  const responseGoogle = async (authResult) => {
+  const handleGoogleLogin = async () => {
     try {
-      if (authResult["code"]) {
-        const result = await googleAuth(authResult.code);
-        const { email, name, image } = result.data.user;
-        const token = result.data.token;
-        const obj = { email, name, token, image };
-        localStorage.setItem('user-info', JSON.stringify(obj));
-        navigate('/dashboard');
-      }
-    } catch (e) {
-      console.log('Error while Google Login...', e);
+      const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL;
+      const response = await axios.get(`${apiBaseUrl}/api/auth/google`);
+      const { authUrl } = response.data;
+      console.log("Redirecting to Google Auth URL:", authUrl);
+      window.location.href = authUrl; // Redirect the user to Google's auth page
+    } catch (error) {
+      console.error("Error initiating Google Auth:", error);
+      alert("Failed to initiate Google login");
     }
   };
 
-  const googleLogin = useGoogleLogin({
-    onSuccess: responseGoogle,
-    onError: responseGoogle,
-    flow: "auth-code",
-  });
-
   const [suggestedPassword, setSuggestedPassword] = useState('');
-
 
   const handleSuggestPassword = async () => {
     console.log("Bouton cliqué !");
 
     try {
-      //const response = await axios.get("http://localhost:4000/api/auth/generate-password");
-      const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL; // Use the same env variable as signup
+      const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL;
       const response = await axios.get(`${apiBaseUrl}/api/auth/generate-password`);
       setSuggestedPassword(response.data.password);
-      console.log("Suggested password :", response.data.password);
+      console.log("Suggested password:", response.data.password);
     } catch (error) {
       if (error.response) {
         console.error("Error while suggesting the password:", error.response.data);
-        alert(error.response.data.message || "Error while suggesting the password..");
+        alert(error.response.data.message || "Error while suggesting the password.");
       } else {
-        console.error("Unknown error :", error);
+        console.error("Unknown error:", error);
         alert("Unknown error while suggesting the password.");
       }
     }
@@ -114,13 +102,12 @@ const SignUp = () => {
     if (suggestedPassword) {
       navigator.clipboard.writeText(suggestedPassword)
         .then(() => {
-          console.log("Password copied :", suggestedPassword);
-          alert("Password copied !");
+          console.log("Password copied:", suggestedPassword);
+          alert("Password copied!");
         })
-        .catch(err => console.error("Error while copying :", err));
+        .catch(err => console.error("Error while copying:", err));
     }
   };
-
 
   const useSuggestedPassword = () => {
     setFormData((prevData) => ({
@@ -128,6 +115,7 @@ const SignUp = () => {
       password: suggestedPassword,
     }));
   };
+
   return (
     <div className="sign-in-bg">
       <div className="app-wrapper d-block">
@@ -245,15 +233,15 @@ const SignUp = () => {
                       {suggestedPassword && (
                         <div className="col-6">
                           <div className="d-flex justify-content-between align-items-center p-3 border rounded">
-                            <span className=" text-black">{suggestedPassword}</span>
+                            <span className="text-black">{suggestedPassword}</span>
                             <button className="btn btn-sm btn-primary" type="button" onClick={useSuggestedPassword}>
                               Use
                             </button>
-                            <FaCopy className="cursor-pointer hover:text-gray-800 transition"
+                            <FaCopy
+                              className="cursor-pointer hover:text-gray-800 transition"
                               style={{ color: "#8c76f0", fontSize: "22px" }}
                               onClick={handleCopyPassword}
                             />
-
                           </div>
                         </div>
                       )}
@@ -287,10 +275,10 @@ const SignUp = () => {
                       </div>
                       <div className="col-12">
                         <div className="text-center">
-                          <button className="btn btn-light-facebook icon-btn b-r-22 m-1" type="button" >
+                          <button className="btn btn-light-facebook icon-btn b-r-22 m-1" type="button">
                             <i className="ti ti-brand-facebook"></i>
                           </button>
-                          <button className="btn btn-light-gmail icon-btn b-r-22 m-1" type="button" onClick={googleLogin}>
+                          <button className="btn btn-light-gmail icon-btn b-r-22 m-1" type="button" onClick={handleGoogleLogin}>
                             <i className="ti ti-brand-google"></i>
                           </button>
                           <button className="btn btn-light-github icon-btn b-r-22 m-1" type="button">
