@@ -6,7 +6,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import Sidebar from '../Layout/SideBar';
 import Header from '../Layout/Header';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Avatar4 from '../../assets/images/avtar/user.jpg';
 import axios from 'axios';
 import { Modal, Button, Form } from 'react-bootstrap';
@@ -32,15 +32,20 @@ const Dashboard = () => {
   const [taskForm, setTaskForm] = useState({ title: '', description: '', startDate: '', dueDate: '', status: '', priority: '' });
   const projectsPerPage = 10;
   const navigate = useNavigate();
+  const location = useLocation(); // Ajout pour lire les paramètres de l'URL
 
-  // Define the API base URL using the deployed backend URL
   const API_BASE_URL = "https://backend-projectmanagement-mg0q.onrender.com";
 
+  // Extraction des paramètres token et email après redirection Google
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      navigate('/login');
-      return;
+    const params = new URLSearchParams(location.search);
+    const token = params.get('token');
+    const email = params.get('email');
+
+    if (token && email) {
+      localStorage.setItem('token', token); // Stocker le token
+      localStorage.setItem('user-info', JSON.stringify({ email, token })); // Stocker les infos utilisateur
+      window.history.replaceState({}, document.title, '/dashboard'); // Nettoyer l'URL
     }
 
     const fetchData = async () => {
@@ -49,16 +54,16 @@ const Dashboard = () => {
 
         const [userResponse, projectsResponse, tasksResponse, usersResponse] = await Promise.all([
           axios.get(`${API_BASE_URL}/api/profile`, {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
           }),
           axios.get(`${API_BASE_URL}/api/projects`, {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
           }),
           axios.get(`${API_BASE_URL}/api/tasks`, {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
           }),
           axios.get(`${API_BASE_URL}/api/auth/users`, {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
           }).catch(() => ({ data: [] })),
         ]);
 
@@ -139,8 +144,10 @@ const Dashboard = () => {
     };
 
     fetchData();
-  }, [navigate]);
+  }, [navigate, location]);
 
+  // Le reste du code reste identique (handleImageError, handleEventClick, etc.)
+  // Copié ici pour référence, mais non modifié
   const handleImageError = (e) => {
     e.target.src = Avatar4;
   };
@@ -596,9 +603,7 @@ const Dashboard = () => {
                                 </td>
                                 <td>
                                   <span
-                                    className={`badge badge-${
-                                      project.status ? project.status.toLowerCase().replace(" ", "-") : "unknown"
-                                    } f-s-9 f-w-700`}
+                                    className={`badge badge-${project.status ? project.status.toLowerCase().replace(" ", "-") : "unknown"} f-s-9 f-w-700`}
                                     style={
                                       project.status === "In Progress"
                                         ? { backgroundColor: "#f5f5d5", color: "#000" }
@@ -910,7 +915,7 @@ const Dashboard = () => {
                           },
                         ],
                       }}
-                      series={[ 
+                      series={[
                         displayedTasks.filter((t) => t.status === 'Done').length,
                         displayedTasks.filter((t) => t.status === 'Tested').length,
                         displayedTasks.filter((t) => t.status === 'Review').length,

@@ -1,9 +1,9 @@
 import LogoNoir from '../../assets/images/logo/LogoNoir.png';
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useGoogleLogin } from '@react-oauth/google';
 import { googleAuth } from '../../api';
-import { FaCopy } from "react-icons/fa"; // Import de l'icône
+import { FaCopy } from "react-icons/fa";
 import axios from 'axios';
 import "../../assets/css/style.css";
 
@@ -28,7 +28,7 @@ const SignUp = () => {
     console.log("Form Data:", formData);
 
     try {
-      const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL ;
+      const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL;
       const response = await fetch(`${apiBaseUrl}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -66,36 +66,23 @@ const SignUp = () => {
     }));
   };
 
-  const responseGoogle = async (authResult) => {
-    try {
-      if (authResult["code"]) {
-        const result = await googleAuth(authResult.code);
-        const { email, name, image } = result.data.user;
-        const token = result.data.token;
-        const obj = { email, name, token, image };
-        localStorage.setItem('user-info', JSON.stringify(obj));
-        navigate('/dashboard');
-      }
-    } catch (e) {
-      console.log('Error while Google Login...', e);
-    }
+  // Nouvelle logique pour Google : redirection directe via le backend
+  const handleGoogleLogin = () => {
+    const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL;
+    window.location.href = `${apiBaseUrl}/api/auth/google`; // Redirige vers le backend pour initier le flux OAuth
   };
 
-  const googleLogin = useGoogleLogin({
-    onSuccess: responseGoogle,
-    onError: responseGoogle,
-    flow: "auth-code",
-  });
+  // Supprimer responseGoogle et useGoogleLogin, car ils ne sont plus nécessaires
+  // (on laisse la fonction vide pour éviter les erreurs si elle est appelée ailleurs)
+  const responseGoogle = () => {};
 
   const [suggestedPassword, setSuggestedPassword] = useState('');
-
 
   const handleSuggestPassword = async () => {
     console.log("Bouton cliqué !");
 
     try {
-      //const response = await axios.get("http://localhost:4000/api/auth/generate-password");
-      const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL; // Use the same env variable as signup
+      const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL;
       const response = await axios.get(`${apiBaseUrl}/api/auth/generate-password`);
       setSuggestedPassword(response.data.password);
       console.log("Suggested password :", response.data.password);
@@ -121,13 +108,13 @@ const SignUp = () => {
     }
   };
 
-
   const useSuggestedPassword = () => {
     setFormData((prevData) => ({
       ...prevData,
       password: suggestedPassword,
     }));
   };
+
   return (
     <div className="sign-in-bg">
       <div className="app-wrapper d-block">
@@ -245,15 +232,15 @@ const SignUp = () => {
                       {suggestedPassword && (
                         <div className="col-6">
                           <div className="d-flex justify-content-between align-items-center p-3 border rounded">
-                            <span className=" text-black">{suggestedPassword}</span>
+                            <span className="text-black">{suggestedPassword}</span>
                             <button className="btn btn-sm btn-primary" type="button" onClick={useSuggestedPassword}>
                               Use
                             </button>
-                            <FaCopy className="cursor-pointer hover:text-gray-800 transition"
+                            <FaCopy
+                              className="cursor-pointer hover:text-gray-800 transition"
                               style={{ color: "#8c76f0", fontSize: "22px" }}
                               onClick={handleCopyPassword}
                             />
-
                           </div>
                         </div>
                       )}
@@ -287,10 +274,10 @@ const SignUp = () => {
                       </div>
                       <div className="col-12">
                         <div className="text-center">
-                          <button className="btn btn-light-facebook icon-btn b-r-22 m-1" type="button" >
+                          <button className="btn btn-light-facebook icon-btn b-r-22 m-1" type="button">
                             <i className="ti ti-brand-facebook"></i>
                           </button>
-                          <button className="btn btn-light-gmail icon-btn b-r-22 m-1" type="button" onClick={googleLogin}>
+                          <button className="btn btn-light-gmail icon-btn b-r-22 m-1" type="button" onClick={handleGoogleLogin}>
                             <i className="ti ti-brand-google"></i>
                           </button>
                           <button className="btn btn-light-github icon-btn b-r-22 m-1" type="button">
