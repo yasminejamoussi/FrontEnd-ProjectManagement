@@ -377,17 +377,7 @@ const RoleManagement = () => {
                         />
                       </div>
                     </div>
-                    <div className="form-group">
-                      <Button
-                        id="createRole"
-                        variant="primary"
-                        onClick={() => setShowCreateRoleModal(true)}
-                        style={{ minWidth: '150px', height: '38px', borderRadius: '5px', lineHeight: '1.5' }}
-                        aria-label="Create a new role"
-                      >
-                        Create Role
-                      </Button>
-                    </div>
+              
                     <div className="form-group">
                       <Button
                         id="assignRole"
