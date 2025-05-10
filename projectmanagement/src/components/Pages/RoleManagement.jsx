@@ -59,6 +59,19 @@ const RoleManagement = () => {
       .catch((error) => console.error('Erreur récupération données:', error));
   }, [token, apiBaseUrl]);
 
+  useEffect(() => {
+    if (token) {
+      axios
+        .get(`${apiBaseUrl}/api/auth/users`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        .then((response) => {
+          setAvailableUsers(response.data);
+        })
+        .catch((error) => console.error('Erreur récupération utilisateurs:', error));
+    }
+  }, [token, apiBaseUrl]);
+
   const handleRoleChange = (e, mode = 'add') => {
     const { name, value, type, checked, multiple } = e.target;
 
@@ -191,7 +204,6 @@ const RoleManagement = () => {
     }
 
     try {
-      // Mettre à jour le rôle
       const roleResponse = await axios.put(
         `${apiBaseUrl}/api/roles/${selectedRole._id}`,
         {
@@ -203,27 +215,36 @@ const RoleManagement = () => {
         }
       );
 
-      // Synchroniser User.role pour chaque utilisateur
       const previousUsers = roles.find((r) => r._id === selectedRole._id).users.map((u) => u._id.toString());
       const newUsers = selectedRole.users;
 
-      // Utilisateurs à retirer
       const usersToRemove = previousUsers.filter((id) => !newUsers.includes(id));
       for (const userId of usersToRemove) {
-        const guestRole = await Role.findOne({ name: 'Guest' });
-        await User.findByIdAndUpdate(userId, { role: guestRole._id });
+        const guestRoleResponse = await axios.get(`${apiBaseUrl}/api/roles`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const guestRole = guestRoleResponse.data.find((role) => role.name === 'Guest');
+        await axios.put(
+          `${apiBaseUrl}/api/auth/users/${userId}`,
+          { role: guestRole._id },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
       }
 
-      // Utilisateurs à ajouter
       const usersToAdd = newUsers.filter((id) => !previousUsers.includes(id));
       for (const userId of usersToAdd) {
-        await User.findByIdAndUpdate(userId, { role: selectedRole._id });
+        await axios.put(
+          `${apiBaseUrl}/api/auth/users/${userId}`,
+          { role: selectedRole._id },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
       }
 
-      // Mettre à jour Role.users
-      await Role.findByIdAndUpdate(selectedRole._id, {
-        $set: { users: newUsers },
-      });
+      await axios.put(
+        `${apiBaseUrl}/api/roles/${selectedRole._id}`,
+        { users: newUsers },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
       setRoles((prevRoles) =>
         prevRoles.map((role) => (role._id === selectedRole._id ? { ...roleResponse.data, users: newUsers } : role))
@@ -302,20 +323,6 @@ const RoleManagement = () => {
       setCurrentPage(newPage);
     }
   };
-
-  // Récupérer tous les utilisateurs pour l'assignation
-  useEffect(() => {
-    if (token) {
-      axios
-        .get(`${apiBaseUrl}/api/auth/users`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        .then((response) => {
-          setAvailableUsers(response.data);
-        })
-        .catch((error) => console.error('Erreur récupération utilisateurs:', error));
-    }
-  }, [token, apiBaseUrl]);
 
   return (
     <div className="app-wrapper">
@@ -515,7 +522,10 @@ const RoleManagement = () => {
             <select
               className="form-control"
               value={newRole.name}
-              onChange={(e) => setNewRole({ ...newRole, name: e.target.value })}
+              onChange={(e) => {
+                const roleName = e.target.value;
+                setNewRole({ ...newRole, name: roleName, users: [] });
+              }}
             >
               <option value="">Select a role</option>
               {roles.map((role) => (
@@ -533,11 +543,28 @@ const RoleManagement = () => {
               onChange={(e) => setNewRole({ ...newRole, users: [e.target.value] })}
             >
               <option value="">Select a user</option>
-              {availableUsers.map((user) => (
-                <option key={user._id} value={user._id}>
-                  {user.firstname} {user.lastname}
-                </option>
-              ))}
+              {availableUsers
+                .filter((user) => {
+                  if (!user.role || !user.role.name) return false;
+                  const userRole = user.role.name;
+                  switch (newRole.name) {
+                    case 'Admin':
+                      return ['Project Manager', 'Team Leader', 'Team Member', 'Guest'].includes(userRole);
+                    case 'Project Manager':
+                      return ['Team Leader', 'Team Member', 'Guest'].includes(userRole);
+                    case 'Team Leader':
+                      return ['Team Member', 'Guest'].includes(userRole);
+                    case 'Team Member':
+                      return ['Guest'].includes(userRole);
+                    default:
+                      return false;
+                  }
+                })
+                .map((user) => (
+                  <option key={user._id} value={user._id}>
+                    {user.firstname} {user.lastname} (Role: {user.role.name})
+                  </option>
+                ))}
             </select>
           </div>
         </Modal.Body>

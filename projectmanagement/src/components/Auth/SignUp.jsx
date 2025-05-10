@@ -1,8 +1,6 @@
 import LogoNoir from '../../assets/images/logo/LogoNoir.png';
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useGoogleLogin } from '@react-oauth/google';
-import { googleAuth } from '../../api';
 import { FaCopy } from "react-icons/fa";
 import axios from 'axios';
 import "../../assets/css/style.css";
@@ -66,15 +64,28 @@ const SignUp = () => {
     }));
   };
 
-  // Nouvelle logique pour Google : redirection directe via le backend
   const handleGoogleLogin = () => {
     const apiBaseUrl = import.meta.env.VITE_REACT_APP_API_URL;
-    window.location.href = `${apiBaseUrl}/api/auth/google`; // Redirige vers le backend pour initier le flux OAuth
-  };
+    const width = 500;
+    const height = 600;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+    const popup = window.open(
+      `${apiBaseUrl}/api/auth/google?popup=true`,
+      'GoogleLogin',
+      `width=${width},height=${height},top=${top},left=${left},resizable,scrollbars=yes`
+    );
 
-  // Supprimer responseGoogle et useGoogleLogin, car ils ne sont plus nécessaires
-  // (on laisse la fonction vide pour éviter les erreurs si elle est appelée ailleurs)
-  const responseGoogle = () => {};
+    window.addEventListener('message', (event) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data.token && event.data.email) {
+        localStorage.setItem('token', event.data.token);
+        localStorage.setItem('user-info', JSON.stringify({ email: event.data.email, token: event.data.token }));
+        popup.close();
+        navigate('/dashboard');
+      }
+    }, { once: true });
+  };
 
   const [suggestedPassword, setSuggestedPassword] = useState('');
 
@@ -222,7 +233,6 @@ const SignUp = () => {
                         </div>
                       </div>
 
-                      {/* Bouton de suggestion de mot de passe */}
                       <div className="col-6">
                         <button className="btn btn-primary w-100 mb-2" type="button" onClick={handleSuggestPassword}>
                           Suggest a Secure Password
