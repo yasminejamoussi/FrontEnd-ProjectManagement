@@ -23,10 +23,8 @@ const NotificationsPage = () => {
   const [totalPages, setTotalPages] = useState(1);
   const notificationsPerPage = 10;
 
-  // Define the API base URL using the deployed backend URL
   const API_BASE_URL = "https://backend-projectmanagement-mg0q.onrender.com";
 
-  // Fonction pour récupérer les notifications dynamiques (comme dans Header)
   const fetchDynamicNotifications = async () => {
     try {
       console.log('Fetching projects...');
@@ -43,12 +41,13 @@ const NotificationsPage = () => {
               type: 'project',
               projectId: project._id,
               projectName: project.name,
+              projectManager: project.projectManager, // Include projectManager for filtering
               riskOfDelay: delayResponse.data.riskOfDelay,
               delayDays: delayResponse.data.delayDays,
               status: project.status,
               endDate: project.endDate,
-              createdAt: new Date(), // Pour simuler une date de création
-              read: false, // Les notifications dynamiques sont considérées comme non lues
+              createdAt: new Date(),
+              read: false,
               message: `Potential delay detected for project "${project.name}". Risk of delay: ${delayResponse.data.riskOfDelay}, Estimated delay: ${delayResponse.data.delayDays} days. End date: ${new Date(project.endDate).toLocaleDateString('en-GB')}.`,
             };
           }
@@ -114,7 +113,6 @@ const NotificationsPage = () => {
       }
 
       try {
-        // Récupérer le profil utilisateur
         const userResponse = await axios.get(`${API_BASE_URL}/api/profile`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -123,10 +121,8 @@ const NotificationsPage = () => {
         setUserRole(user.role?.name || 'Guest');
         setUserId(user._id);
 
-        // Récupérer les notifications dynamiques
         const dynamicNotifications = await fetchDynamicNotifications();
 
-        // Récupérer les notifications persistantes (par exemple, anomalies)
         const persistentResponse = await axios.get(`${API_BASE_URL}/api/notifications/my-notifications`, {
           headers: { Authorization: `Bearer ${token}` },
           params: {
@@ -142,26 +138,51 @@ const NotificationsPage = () => {
         const persistentNotifs = persistentResponse.data.notifications || persistentResponse.data;
         setPersistentNotifications(persistentNotifs);
 
-        // Fusionner les notifications dynamiques et persistantes
         const allNotifications = [
           ...dynamicNotifications.map(notif => ({
             ...notif,
-            _id: `dynamic-${notif.type}-${notif.projectId || notif.taskId}`, // ID temporaire pour les notifications dynamiques
+            _id: `dynamic-${notif.type}-${notif.projectId || notif.taskId}`,
             notificationType: notif.type,
           })),
           ...persistentNotifs,
         ];
 
-        // Filtrer les notifications pertinentes pour l'utilisateur
+        console.log('All notifications before filtering:', allNotifications);
+
         const filteredNotifications = allNotifications.filter(notif => {
-          if (notif.notificationType === 'ANOMALY') {
-            return true; // Les anomalies sont déjà filtrées par l'utilisateur dans l'endpoint
+          // Admins see all notifications
+          if (userRole === 'Admin') {
+            return true;
           }
-          // Pour les notifications dynamiques (project/task), vérifier si l'utilisateur est concerné
-          const isProjectManager = notif.projectManager?._id === userId;
-          const isAssignedToTask = notif.assignedTo?.some(assignee => assignee._id === userId);
-          const isAdmin = userRole === 'Admin';
-          return isAdmin || isProjectManager || isAssignedToTask;
+
+          // For non-Admins, filter based on relevance
+          if (notif.notificationType === 'ANOMALY') {
+            return true; // Backend already filters anomalies for the user
+          }
+
+          if (notif.notificationType === 'project') {
+            const isProjectManager = notif.projectManager?._id === userId;
+            console.log(`Project notification filtering:`, {
+              projectName: notif.projectName,
+              projectManagerId: notif.projectManager?._id,
+              userId,
+              isProjectManager,
+            });
+            return isProjectManager;
+          }
+
+          if (notif.notificationType === 'task') {
+            const isAssignedToTask = notif.assignedTo?.some(assignee => assignee._id === userId);
+            console.log(`Task notification filtering:`, {
+              taskTitle: notif.taskTitle,
+              assignedTo: notif.assignedTo?.map(a => a._id),
+              userId,
+              isAssignedToTask,
+            });
+            return isAssignedToTask;
+          }
+
+          return false;
         });
 
         setNotifications(filteredNotifications);
@@ -204,7 +225,6 @@ const NotificationsPage = () => {
   };
 
   const markAsRead = async (notificationId) => {
-    // On ne peut marquer comme lues que les notifications persistantes
     if (!notificationId.startsWith('dynamic-')) {
       try {
         const token = localStorage.getItem('token');
@@ -281,7 +301,7 @@ const NotificationsPage = () => {
           <div className="container-fluid">
             <div className="row m-1">
               <div className="col-12">
-              <h4 className="section-title f-w-700 mb-4">Notifications Management</h4>
+                <h4 className="section-title f-w-700 mb-4">Notifications Management</h4>
               </div>
             </div>
             <div className="row mb-4">
