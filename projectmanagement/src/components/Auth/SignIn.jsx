@@ -15,7 +15,6 @@ const SignIn = () => {
   const [useFaceID, setUseFaceID] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
   const [showGuestModal, setShowGuestModal] = useState(false);
-  const [pending2FA, setPending2FA] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -47,30 +46,6 @@ const SignIn = () => {
       const response = await axios.post(`${apiBaseUrl}/api/auth/login`, { email, password });
       console.log("API response:", response.data);
 
-      if (response.data.message === "2FA required") {
-        const user = response.data.user;
-        console.log("Received user object (2FA):", user);
-        const roleName = user?.role?.name || "Guest";
-        console.log("Parsed role name (2FA):", roleName);
-
-        // Stocker le token pour 2FA
-        localStorage.setItem("token", response.data.token);
-        localStorage.setItem("email", email);
-
-        if (roleName === "Guest") {
-          console.log("Guest user detected, showing modal before 2FA");
-          setShowGuestModal(true);
-          setPending2FA(true);
-          setLoading(false);
-          return;
-        }
-
-        console.log("Non-guest user, redirecting to 2FA");
-        navigate("/verify-2fa", { state: { email } });
-        setLoading(false);
-        return;
-      }
-
       const { token, user } = response.data;
       console.log("Received user object:", user);
       const roleName = user?.role?.name || "Guest";
@@ -79,6 +54,15 @@ const SignIn = () => {
       if (roleName === "Guest") {
         console.log("Guest user detected, showing modal");
         setShowGuestModal(true);
+        setLoading(false);
+        return;
+      }
+
+      if (response.data.message === "2FA required") {
+        console.log("Non-guest user, redirecting to 2FA");
+        localStorage.setItem("token", token);
+        localStorage.setItem("email", email);
+        navigate("/verify-2fa", { state: { email } });
         setLoading(false);
         return;
       }
@@ -117,30 +101,6 @@ const SignIn = () => {
       const response = await axios.post(`${apiBaseUrl}/api/auth/login-with-face`, { faceLabel: label });
       console.log("FaceID API response:", response.data);
 
-      if (response.data.message === "2FA required") {
-        const user = response.data.user;
-        console.log("Received user object (FaceID, 2FA):", user);
-        const roleName = user?.role?.name || "Guest";
-        console.log("Parsed role name (FaceID, 2FA):", roleName);
-
-        // Stocker le token pour 2FA
-        localStorage.setItem("token", response.data.token);
-        localStorage.setItem("email", user.email);
-
-        if (roleName === "Guest") {
-          console.log("Guest user detected (FaceID), showing modal before 2FA");
-          setShowGuestModal(true);
-          setPending2FA(true);
-          setLoading(false);
-          return;
-        }
-
-        console.log("Non-guest user (FaceID), redirecting to 2FA");
-        navigate("/verify-2fa", { state: { email: user.email } });
-        setLoading(false);
-        return;
-      }
-
       const { token, user } = response.data;
       console.log("Received user object (FaceID):", user);
       const roleName = user?.role?.name || "Guest";
@@ -149,6 +109,15 @@ const SignIn = () => {
       if (roleName === "Guest") {
         console.log("Guest user detected (FaceID), showing modal");
         setShowGuestModal(true);
+        setLoading(false);
+        return;
+      }
+
+      if (response.data.message === "2FA required") {
+        console.log("Non-guest user (FaceID), redirecting to 2FA");
+        localStorage.setItem("token", token);
+        localStorage.setItem("email", user.email);
+        navigate("/verify-2fa", { state: { email: user.email } });
         setLoading(false);
         return;
       }
@@ -170,14 +139,8 @@ const SignIn = () => {
 
   const handleGuestModalClose = () => {
     setShowGuestModal(false);
-    if (pending2FA) {
-      console.log("Modal closed, redirecting to 2FA");
-      navigate("/verify-2fa", { state: { email: localStorage.getItem("email") } });
-      setPending2FA(false);
-    } else {
-      console.log("Guest user, redirecting to landing page");
-      navigate("/"); // Redirect to landing page for Guest users
-    }
+    console.log("Guest user, redirecting to landing page");
+    navigate("/"); // Always redirect Guest users to landing page
   };
 
   return (
