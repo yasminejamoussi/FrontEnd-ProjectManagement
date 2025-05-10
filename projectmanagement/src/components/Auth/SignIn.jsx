@@ -168,14 +168,15 @@ const SignIn = () => {
     }
   };
 
-  const handleGuestModalClose = (path) => {
+  const handleGuestModalClose = () => {
     setShowGuestModal(false);
     if (pending2FA) {
       console.log("Modal closed, redirecting to 2FA");
       navigate("/verify-2fa", { state: { email: localStorage.getItem("email") } });
       setPending2FA(false);
-    } else if (path) {
-      navigate(path);
+    } else {
+      console.log("Guest user, redirecting to landing page");
+      navigate("/"); // Redirect to landing page for Guest users
     }
   };
 
@@ -273,7 +274,7 @@ const SignIn = () => {
       </div>
       <Modal
         show={showGuestModal}
-        onHide={() => handleGuestModalClose()}
+        onHide={handleGuestModalClose}
         centered
         aria-labelledby="guest-modal-title"
       >
@@ -303,7 +304,7 @@ const SignIn = () => {
           </div>
         </Modal.Body>
         <Modal.Footer className="justify-content-center" data-aos="fade-up" data-aos-delay="200">
-          <Button variant="danger" onClick={() => handleGuestModalClose("/")} aria-label="Return to home">
+          <Button variant="danger" onClick={handleGuestModalClose} aria-label="Return to home">
             Return to Home
           </Button>
         </Modal.Footer>
