@@ -408,7 +408,7 @@ const Profile = ({ userId }) => {
                                     <input
                                       type="file"
                                       id="cvUpload"
-                                      accept=".pdf,.docx"
+                                      accept=".pdf"
                                       onChange={handleCvChange}
                                       style={{ display: "none" }}
                                     />
