@@ -587,7 +587,6 @@ const Dashboard = () => {
                             <th scope="col">Project Owner</th>
                             <th scope="col">Start Date</th>
                             <th scope="col">End Date</th>
-                            <th scope="col">Description</th>
                             <th scope="col">Delay Risk</th>
                           </tr>
                         </thead>
@@ -652,12 +651,6 @@ const Dashboard = () => {
                                         year: 'numeric',
                                       })
                                     : 'Not Set'}
-                                </td>
-                                <td>
-                                  <span className="text-dark f-s-14 f-w-500 text-nowrap">
-                                    <CircleDashed className="me-2 f-s-6" />
-                                    {DOMPurify.sanitize(project.description || 'No description available')}
-                                  </span>
                                 </td>
                                 <td>
                                   <span

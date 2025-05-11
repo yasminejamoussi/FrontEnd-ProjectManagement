@@ -324,12 +324,12 @@ const Header = () => {
       await axios.put(`${apiBaseUrl}/api/tasks/${selectedTask.taskId}`, updatedTask, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      alert('Tâche mise à jour avec succès !');
+      alert('Task updated successfully !');
       closeModal();
       fetchNotifications();
     } catch (error) {
       console.error('Erreur lors de la mise à jour de la tâche :', error);
-      alert('Erreur lors de la mise à jour de la tâche.');
+      alert('Error updating task .');
     }
   };
 
@@ -428,7 +428,7 @@ const Header = () => {
                   aria-hidden={openPanel !== 'search'}
                 >
                   <div className="offcanvas-header">
-                    <h5 className="offcanvas-title">Recherche</h5>
+                    <h5 className="offcanvas-title">Search </h5>
                     <button
                       className="btn-close"
                       onClick={closeOffcanvas}
