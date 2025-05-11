@@ -34,7 +34,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const location = useLocation(); // Ajout pour lire les paramètres de l'URL
 
-  const API_BASE_URL = "https://backend-projectmanagement-ip1e.onrender.com";
+  const API_BASE_URL = "https://backend-projectmanagement-5rbq.onrender.com";
 
   // Extraction des paramètres token et email après redirection Google
   useEffect(() => {

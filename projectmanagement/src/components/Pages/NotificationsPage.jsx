@@ -23,7 +23,7 @@ const NotificationsPage = () => {
   const [totalPages, setTotalPages] = useState(1);
   const notificationsPerPage = 10;
 
-  const API_BASE_URL = "https://backend-projectmanagement-ip1e.onrender.com";
+  const API_BASE_URL = "https://backend-projectmanagement-5rbq.onrender.com";
 
   const fetchDynamicNotifications = async () => {
     try {

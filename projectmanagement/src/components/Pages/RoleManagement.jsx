@@ -174,7 +174,7 @@ const RoleManagement = () => {
       );
 
       if (response.status === 200) {
-        alert('Rôle assigné avec succès !');
+        alert('Role successfully assigned !');
         const rolesResponse = await axios.get(`${apiBaseUrl}/api/roles`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -184,7 +184,7 @@ const RoleManagement = () => {
       }
     } catch (error) {
       console.error('Erreur lors de l\'assignation du rôle:', error);
-      alert(error.response?.data?.message || 'Erreur lors de l\'assignation du rôle');
+      alert(error.response?.data?.message || 'Error assigning role ');
     }
   };
 
@@ -447,7 +447,7 @@ const RoleManagement = () => {
                           ) : (
                             <tr>
                               <td colSpan="4" className="text-center">
-                                Aucun rôle trouvé
+                              No roles found
                               </td>
                             </tr>
                           )}
