@@ -26,7 +26,7 @@ const Report = () => {
   const reportRef = useRef(null);
 
   // Define the API base URL using the deployed backend URL
-  const API_BASE_URL = "https://backend-projectmanagement-mg0q.onrender.com";
+  const API_BASE_URL = "https://backend-projectmanagement-ip1e.onrender.com";
 
   useEffect(() => {
     const fetchReport = async () => {

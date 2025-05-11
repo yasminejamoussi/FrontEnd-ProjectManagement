@@ -18,7 +18,7 @@ const PasswordReset = () => {
   const { resetCode, email } = location.state || {};  // Récupérer l'email (valeur par défaut si non défini)
 
   // Define the API base URL using the deployed backend URL
-  const API_BASE_URL = "https://backend-projectmanagement-mg0q.onrender.com";
+  const API_BASE_URL = "https://backend-projectmanagement-ip1e.onrender.com";
 
   useEffect(() => {
     if (!resetCode) {

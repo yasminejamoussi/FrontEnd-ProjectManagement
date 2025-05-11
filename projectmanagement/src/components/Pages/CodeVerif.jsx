@@ -15,7 +15,7 @@ const CodeVerification = () => {
   const email = location.state?.email || "defaultEmail@example.com"; // Récupérer l'email du paramètre d'état
 
   // Define the API base URL using the deployed backend URL
-  const API_BASE_URL = "https://backend-projectmanagement-mg0q.onrender.com";
+  const API_BASE_URL = "https://backend-projectmanagement-ip1e.onrender.com";
 
   // digitValidate : Assurer que seuls les chiffres sont saisis
   const digitValidate = (value) => {
