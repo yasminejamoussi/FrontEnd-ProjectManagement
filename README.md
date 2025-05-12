@@ -172,8 +172,5 @@ ProjectManagment_IA/
 - This project was completed under the guidance of [Professor Safa Saoudi](mailto:safa.saoudi@esprit.tn) at #Esprit_school_of_engineering.
 - Heartfelt thanks to our amazing team: **Yasmine Jamoussi**, **Khalil Aloui**, **Ranime Sboui**, **Aloui Mustapha**, and **Mohamed Bizani** for their dedication and contributions! 💪
 - Special gratitude to our professor, **Professor Safa Saoudi**, for her unwavering support, invaluable guidance, immense efforts, and trust in our abilities throughout this project at **“Esprit School of Engineering**. 🌟
-- Appreciation for the libraries and tools that powered our project: **React**, **Flask**, **MongoDB**, **Jenkins**, **SonarQube**, **Twilio**, **SendGrid**, and **GitHub Actions**. 🚀
-
-
 
 
