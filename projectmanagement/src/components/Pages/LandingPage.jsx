@@ -126,9 +126,9 @@ function LandingPage() {
                   </Button>
                 </Link>
                 <Link to="/signup">
-                  <Button  className="ms-2 rounded btn pink-button">
+                  <a  className="ms-2 rounded btn pink-button">
                     {t('header.signUp', 'Sign Up')}
-                  </Button>
+                  </a>
                 </Link>
               </BSNavbar.Collapse>
             </div>
