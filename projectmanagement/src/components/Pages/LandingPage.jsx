@@ -121,12 +121,12 @@ function LandingPage() {
                   </Dropdown.Menu>
                 </Dropdown>
                 <Link to="/signin">
-                  <Button variant="danger" className="rounded">
+                  <Button className="rounded">
                     {t('header.signIn', 'Sign In')}
                   </Button>
                 </Link>
                 <Link to="/signup">
-                  <Button variant="primary" className="ms-2 rounded">
+                  <Button  className="ms-2 rounded btn pink-button">
                     {t('header.signUp', 'Sign Up')}
                   </Button>
                 </Link>
@@ -169,14 +169,15 @@ function LandingPage() {
                     />
                     <p dangerouslySetInnerHTML={{ __html: t('hero.subtitle') }} />
                     <div className="mg-t-20">
+                    <Link to="/signin">
                       <a
-                        className="btn btn-danger py-3 px-4 b-r-50 btn-lg ms-2"
-                        href="https://phpstack-1384472-5121645.cloudwaysapps.com/document/php/Orkestra/index.html"
+                        className="btn pink-button py-3 px-4 b-r-50 btn-lg ms-2"
                         target="_blank"
                         role="button"
                       >
                         {t('hero.button')}
                       </a>
+                      </Link>
                     </div>
                   </div>
                 </div>

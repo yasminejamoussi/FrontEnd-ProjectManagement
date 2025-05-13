@@ -7,6 +7,12 @@
   
 }
 
+.pink-button {
+  background-color: rgb(255, 32, 185) !important;
+  border: 1px solid rgba(255, 32, 185)!important;
+  color: rgb(255, 255, 255)!important;
+}
+
 .btnSignIn{
   background-color: rgba(140, 118, 240) !important;
   border: 1px solid rgba(140, 118, 240)!important;
