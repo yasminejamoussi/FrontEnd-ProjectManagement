@@ -1,3 +1,66 @@
+.clusters {
+  margin-top: 20px;
+}
+
+.clusters h2 {
+  font-size: 1.5rem;
+  color: #8575ec;
+  margin-bottom: 20px;
+}
+
+.cluster-card {
+  border: none;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s;
+}
+
+.cluster-card:hover {
+  transform: translateY(-2px);
+}
+
+.cluster-card .card-header {
+  border-radius: 8px 8px 0 0;
+  padding: 15px;
+}
+
+.cluster-card .card-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.cluster-card .card-body {
+  padding: 15px;
+}
+
+.cluster-card .list-group-item {
+  border: none;
+  padding: 10px 0;
+}
+
+.cluster-card .list-group-item strong {
+  font-size: 1rem;
+  color: #333;
+}
+
+.cluster-card .list-group-item p {
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.cluster-frontend .card-header {
+  background-color: #007BFF;
+}
+
+.cluster-backend .card-header {
+  background-color: #28A745;
+}
+
+.cluster-devops .card-header {
+  background-color: #FFA500;
+}
 .report-container {
   max-width: 1200px;
   margin: 20px auto;
@@ -217,8 +280,6 @@ h1 {
   background-color: #8575ec;
   border-color: #8575ec;
 }
-
-
 
 .text-center {
   text-align: center;

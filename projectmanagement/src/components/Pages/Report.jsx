@@ -14,6 +14,7 @@ ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Le
 
 const Report = () => {
   const [report, setReport] = useState(null);
+  const [clusters, setClusters] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showExportButton, setShowExportButton] = useState(true);
@@ -21,42 +22,77 @@ const Report = () => {
   const [exportOptions, setExportOptions] = useState({
     metrics: true,
     charts: true,
-    projectDetails: true
+    projectDetails: true,
+    clusters: true
   });
   const reportRef = useRef(null);
 
-  // Define the API base URL using the deployed backend URL
-  const API_BASE_URL = "https://backend-projectmanagement-5rbq.onrender.com";
-
   useEffect(() => {
-    const fetchReport = async () => {
+    const fetchData = async () => {
       setLoading(true);
       try {
         const token = localStorage.getItem('token');
         if (!token) {
           throw new Error('No token available');
         }
-        const response = await axios.get(`${API_BASE_URL}/api/projects/reports/overview`, {
+
+        // Récupérer le Kareport
+        const reportResponse = await axios.get('https://backend-projectmanagement-5rbq.onrender.com/api/projects/reports/overview', {
           headers: { Authorization: `Bearer ${token}` }
         });
-        if (!response.data) {
+        if (!reportResponse.data) {
           throw new Error('No data received');
         }
-        console.log('Report received:', response.data);
-        setReport(response.data);
+        console.log('Report received:', reportResponse.data);
+        setReport(reportResponse.data);
+
+        // Récupérer les clusters
+        const usersSkills = [
+          ["react", "javascript", "css"],
+          ["node.js", "sql", "express"],
+          ["docker", "aws", "kubernetes"],
+          ["react", "typescript"]
+          // Ajouter plus pour tester : simuler beaucoup de lignes
+          // ...Array(20).fill(["react", "javascript"])
+        ];
+        const clusterResponse = await axios.post('https://backend-projectmanagement-5rbq.onrender.com/api/projects/cluster-users', {
+          users_skills: usersSkills,
+          numClusters: 3
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        console.log('Clusters received:', clusterResponse.data);
+
+        // Mapper les clusters aux noms significatifs
+        const clusterNames = {
+          "0": "Frontend",
+          "1": "Backend",
+          "2": "DevOps"
+        };
+        const mappedClusters = {};
+        Object.entries(clusterResponse.data.clusters).forEach(([clusterId, users]) => {
+          const clusterName = clusterNames[clusterId] || `Cluster ${clusterId}`;
+          mappedClusters[clusterName] = users.map(user => ({
+            firstname: user.firstname || 'Unknown',
+            lastname: user.lastname || '',
+            skills: user.skills || []
+          }));
+        });
+        setClusters(mappedClusters);
+
         setError(null);
       } catch (error) {
-        console.error('Error loading report:', {
+        console.error('Error loading data:', {
           message: error.message,
           status: error.response?.status,
           data: error.response?.data
         });
-        setError('Unable to load the report. Please try again.');
+        setError('Unable to load the report or clusters. Please try again.');
       } finally {
         setLoading(false);
       }
     };
-    fetchReport().catch(err => console.error('Unhandled error:', err));
+    fetchData().catch(err => console.error('Unhandled error:', err));
   }, []);
 
   const exportPDF = async () => {
@@ -72,51 +108,80 @@ const Report = () => {
     const pageWidth = 210;
     const pageHeight = 297;
     const margin = 10;
-    const pageMargin = 10; // Espacement entre pages
+    const usableHeight = pageHeight - 2 * margin;
+    let currentY = margin;
 
     try {
-      const metrics = reportRef.current.querySelector('.metrics');
-      const charts = reportRef.current.querySelector('.charts');
-      const projectDetails = reportRef.current.querySelector('.project-details');
-      const annotations = reportRef.current.querySelector('.annotations');
-      const textarea = reportRef.current.querySelector('.annotations textarea');
+      // Sections à exporter
+      const sections = [
+        { element: reportRef.current.queryQuerySelector('header'), include: true },
+        { element: reportRef.current.querySelector('.metrics'), include: exportOptions.metrics },
+        { element: reportRef.current.querySelector('.charts'), include: exportOptions.charts },
+        { element: reportRef.current.querySelector('.project-details'), include: exportOptions.projectDetails },
+        { element: reportRef.current.querySelector('.clusters'), include: exportOptions.clusters },
+        { element: reportRef.current.querySelector('.annotations'), include: exportOptions.projectDetails }
+      ];
 
-      if (!exportOptions.metrics) metrics.style.display = 'none';
-      if (!exportOptions.charts) charts.style.display = 'none';
-      if (!exportOptions.projectDetails) {
-        projectDetails.style.display = 'none';
-        annotations.style.display = 'none';
-      }
+      // Masquer les éléments non sélectionnés et le textarea
+      sections.forEach(({ element, include }) => {
+        if (element && !include) element.style.display = 'none';
+      });
+      const textarea = reportRef.current.querySelector('.annotations textarea');
       if (textarea) textarea.style.display = 'none';
 
-      const canvas = await html2canvas(reportRef.current, {
-        scale: 2,
-        useCORS: true,
-        logging: true
-      });
-      const imgData = canvas.toDataURL('image/png');
+      // Ajouter chaque section au PDF
+      for (const { element, include } of sections) {
+        if (!element || !include) continue;
 
-      const imgWidth = pageWidth - 2 * margin;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = margin;
-      let pageCount = 0;
+        // Capturer la section
+        const canvas = await html2canvas(element, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          windowWidth: element.scrollWidth
+        });
+        const imgData = canvas.toDataURL('image/png');
 
-      // Première page
-      doc.addImage(imgData, 'PNG', margin, position, imgWidth, Math.min(imgHeight, pageHeight - 2 * margin - pageMargin));
-      heightLeft -= (pageHeight - 2 * margin - pageMargin);
-      pageCount++;
+        // Calculer les dimensions
+        const imgWidth = pageWidth - 2 * margin;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        let heightLeft = imgHeight;
 
-      // Pages suivantes avec espacement
-      while (heightLeft > 0) {
-        doc.addPage();
-        position = margin - heightLeft + pageMargin; // Ajoute pageMargin en haut
-        doc.addImage(imgData, 'PNG', margin, position, imgWidth, Math.min(imgHeight, pageHeight - 2 * margin - pageMargin));
-        heightLeft -= (pageHeight - 2 * margin - pageMargin);
-        pageCount++;
+        // Ajouter l'image section par section
+        while (heightLeft > 0) {
+          if (currentY + Math.min(heightLeft, usableHeight) > pageHeight - margin) {
+            doc.addPage();
+            currentY = margin;
+          }
+
+          doc.addImage(
+            imgData,
+            'PNG',
+            margin,
+            currentY,
+            imgWidth,
+            Math.min(heightLeft, usableHeight),
+            undefined,
+            'FAST'
+          );
+
+          heightLeft -= usableHeight;
+          currentY += Math.min(imgHeight, usableHeight);
+          if (heightLeft > 0) {
+            doc.addPage();
+            currentY = margin;
+          }
+        }
+
+        // Ajouter un espacement entre sections
+        currentY += 5;
       }
 
-      // Ajouter la signature uniquement sur la dernière page
+      // Ajouter la signature sur la dernière page
+      if (currentY + 15 > pageHeight - margin) {
+        doc.addPage();
+        currentY = margin;
+      }
       doc.setFont('Times', 'italic');
       doc.setFontSize(12);
       doc.setTextColor(133, 117, 236);
@@ -131,15 +196,9 @@ const Report = () => {
       console.error('Error exporting PDF:', err);
     } finally {
       setShowExportButton(true);
-      const metrics = reportRef.current.querySelector('.metrics');
-      const charts = reportRef.current.querySelector('.charts');
-      const projectDetails = reportRef.current.querySelector('.project-details');
-      const annotations = reportRef.current.querySelector('.annotations');
-      const textarea = reportRef.current.querySelector('.annotations textarea');
-      if (metrics) metrics.style.display = '';
-      if (charts) charts.style.display = '';
-      if (projectDetails) projectDetails.style.display = '';
-      if (annotations) annotations.style.display = '';
+      sections.forEach(({ element }) => {
+        if (element) element.style.display = '';
+      });
       if (textarea) textarea.style.display = '';
     }
   };
@@ -171,6 +230,17 @@ const Report = () => {
       csvData.push(['Name', 'Duration']);
       report.data.longestProjects.forEach(p => {
         csvData.push([p.name || 'Unknown', `${p.duration.toFixed(1)} days`]);
+      });
+    }
+
+    if (exportOptions.clusters && clusters) {
+      csvData.push([]);
+      csvData.push(['Team Clusters']);
+      csvData.push(['Cluster', 'User', 'Skills']);
+      Object.entries(clusters).forEach(([clusterName, users]) => {
+        users.forEach(user => {
+          csvData.push([clusterName, `${user.firstname} ${user.lastname}`, user.skills.join(', ')]);
+        });
       });
     }
 
@@ -340,6 +410,39 @@ const Report = () => {
               )}
             </section>
 
+            <section className="clusters">
+              <h2>Team Clusters</h2>
+              {clusters && Object.keys(clusters).length > 0 ? (
+                <div className="row">
+                  {Object.entries(clusters).map(([clusterName, users], index) => (
+                    <div key={clusterName} className="col-12 col-md-4 mb-4">
+                      <div className={`card cluster-card cluster-${clusterName.toLowerCase()}`}>
+                        <div className="card-header">
+                          <h3 className="card-title">{clusterName}</h3>
+                        </div>
+                        <div className="card-body">
+                          {users.length > 0 ? (
+                            <ul className="list-group list-group-flush">
+                              {users.map(user => (
+                                <li key={`${user.firstname}-${user.lastname}`} className="list-group-item">
+                                  <strong>{user.firstname} {user.lastname}</strong>
+                                  <p className="mb-0">Skills: {user.skills.join(', ')}</p>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p>No users in this cluster</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p>No clusters available</p>
+              )}
+            </section>
+
             <section className="annotations">
               <h2>Annotations</h2>
               <textarea
@@ -361,44 +464,59 @@ const Report = () => {
               <div className="text-center">
                 <div className="export-options">
                   <h3>Export Options</h3>
-                  <div className="form-check">
-                    <input
-                      type="checkbox"
-                      className="form-check-input"
-                      id="metrics"
-                      name="metrics"
-                      checked={exportOptions.metrics}
-                      onChange={handleExportOptionChange}
-                    />
-                    <label className="form-check-label" htmlFor="metrics">
-                      Include Metrics
-                    </label>
-                  </div>
-                  <div className="form-check">
-                    <input
-                      type="checkbox"
-                      className="form-check-input"
-                      id="charts"
-                      name="charts"
-                      checked={exportOptions.charts}
-                      onChange={handleExportOptionChange}
-                    />
-                    <label className="form-check-label" htmlFor="charts">
-                      Include Charts
-                    </label>
-                  </div>
-                  <div className="form-check">
-                    <input
-                      type="checkbox"
-                      className="form-check-input"
-                      id="projectDetails"
-                      name="projectDetails"
-                      checked={exportOptions.projectDetails}
-                      onChange={handleExportOptionChange}
-                    />
-                    <label className="form-check-label" htmlFor="projectDetails">
-                      Include Project Details & Annotations
-                    </label>
+                  <div className="checkbox-container">
+                    <div className="form-check">
+                      <input
+                        type="checkbox"
+                        className="form-check-input"
+                        id="metrics"
+                        name="metrics"
+                        checked={exportOptions.metrics}
+                        onChange={handleExportOptionChange}
+                      />
+                      <label className="form-check-label" htmlFor="metrics">
+                        Include Metrics
+                      </label>
+                    </div>
+                    <div className="form-check">
+                      <input
+                        type="checkbox"
+                        className="form-check-input"
+                        id="charts"
+                        name="charts"
+                        checked={exportOptions.charts}
+                        onChange={handleExportOptionChange}
+                      />
+                      <label className="form-check-label" htmlFor="charts">
+                        Include Charts
+                      </label>
+                    </div>
+                    <div className="form-check">
+                      <input
+                        type="checkbox"
+                        className="form-check-input"
+                        id="projectDetails"
+                        name="projectDetails"
+                        checked={exportOptions.projectDetails}
+                        onChange={handleExportOptionChange}
+                      />
+                      <label className="form-check-label" htmlFor="projectDetails">
+                        Include Project Details & Annotations
+                      </label>
+                    </div>
+                    <div className="form-check">
+                      <input
+                        type="checkbox"
+                        className="form-check-input"
+                        id="clusters"
+                        name="clusters"
+                        checked={exportOptions.clusters}
+                        onChange={handleExportOptionChange}
+                      />
+                      <label className="form-check-label" htmlFor="clusters">
+                        Include Team Clusters
+                      </label>
+                    </div>
                   </div>
                 </div>
                 <button onClick={exportPDF} className="btn btn-primary m-2">
