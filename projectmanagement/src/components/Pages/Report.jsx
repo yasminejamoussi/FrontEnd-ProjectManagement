@@ -36,7 +36,7 @@ const Report = () => {
           throw new Error('No token available');
         }
 
-        // Récupérer le Kareport
+        // Fetch the report
         const reportResponse = await axios.get('https://backend-projectmanagement-5rbq.onrender.com/api/projects/reports/overview', {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -46,24 +46,14 @@ const Report = () => {
         console.log('Report received:', reportResponse.data);
         setReport(reportResponse.data);
 
-        // Récupérer les clusters
-        const usersSkills = [
-          ["react", "javascript", "css"],
-          ["node.js", "sql", "express"],
-          ["docker", "aws", "kubernetes"],
-          ["react", "typescript"]
-          // Ajouter plus pour tester : simuler beaucoup de lignes
-          // ...Array(20).fill(["react", "javascript"])
-        ];
-        const clusterResponse = await axios.post('https://backend-projectmanagement-5rbq.onrender.com/api/projects/cluster-users', {
-          users_skills: usersSkills,
-          numClusters: 3
-        }, {
+        // Fetch clusters using GET request
+        const numClusters = 3; // Hardcoded as per backend default
+        const clusterResponse = await axios.get(`https://backend-projectmanagement-5rbq.onrender.com/api/projects/cluster-users?numClusters=${numClusters}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         console.log('Clusters received:', clusterResponse.data);
 
-        // Mapper les clusters aux noms significatifs
+        // Map clusters to meaningful names
         const clusterNames = {
           "0": "Frontend",
           "1": "Backend",
@@ -114,7 +104,7 @@ const Report = () => {
     try {
       // Sections à exporter
       const sections = [
-        { element: reportRef.current.queryQuerySelector('header'), include: true },
+        { element: reportRef.current.querySelector('header'), include: true },
         { element: reportRef.current.querySelector('.metrics'), include: exportOptions.metrics },
         { element: reportRef.current.querySelector('.charts'), include: exportOptions.charts },
         { element: reportRef.current.querySelector('.project-details'), include: exportOptions.projectDetails },
