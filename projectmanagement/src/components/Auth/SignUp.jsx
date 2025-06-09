@@ -284,15 +284,11 @@ const SignUp = () => {
                       </div>
                       <div className="col-12">
                         <div className="text-center">
-                          <button className="btn btn-light-facebook icon-btn b-r-22 m-1" type="button">
-                            <i className="ti ti-brand-facebook"></i>
-                          </button>
+                         
                           <button className="btn btn-light-gmail icon-btn b-r-22 m-1" type="button" onClick={handleGoogleLogin}>
                             <i className="ti ti-brand-google"></i>
                           </button>
-                          <button className="btn btn-light-github icon-btn b-r-22 m-1" type="button">
-                            <i className="ti ti-brand-github"></i>
-                          </button>
+                        
                         </div>
                       </div>
                     </div>
